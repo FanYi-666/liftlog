@@ -1,5 +1,5 @@
 const STORAGE_KEY = "liftlog-v1";
-const SCHEMA_VERSION = 11;
+const SCHEMA_VERSION = 12;
 
 const defaultState = {
   schemaVersion: SCHEMA_VERSION,
@@ -9,6 +9,7 @@ const defaultState = {
     carbsGoal: 250,
     fatGoal: 70,
     restSeconds: 120,
+    theme: "system",
   },
   exercises: [
     { id: "bench-press", name: "杠铃卧推", mode: "weighted", primaryMuscle: "胸", equipment: "barbell" },
@@ -256,6 +257,7 @@ function loadState() {
     const carbsGoal = Math.max(0, Number(saved.settings?.carbsGoal) || defaultState.settings.carbsGoal);
     const fatGoal = Math.max(0, Number(saved.settings?.fatGoal) || defaultState.settings.fatGoal);
     const restSeconds = Math.min(600, Math.max(15, Number(saved.settings?.restSeconds) || defaultState.settings.restSeconds));
+    const theme = ["system", "dark", "light"].includes(saved.settings?.theme) ? saved.settings.theme : "system";
     const records = Array.isArray(saved.records)
       ? saved.records.map((record) => ({
           id: record.id,
@@ -279,7 +281,7 @@ function loadState() {
 
     return {
       schemaVersion: SCHEMA_VERSION,
-      settings: { calorieGoal, proteinGoal, carbsGoal, fatGoal, restSeconds },
+      settings: { calorieGoal, proteinGoal, carbsGoal, fatGoal, restSeconds, theme },
       exercises: normalizeExercises(saved.exercises),
       records,
       foodRecords: normalizeFoodRecords(saved.foodRecords),
@@ -300,6 +302,36 @@ state = loadState();
 function saveState() {
   state.schemaVersion = SCHEMA_VERSION;
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+}
+
+const themeMediaQuery = window.matchMedia("(prefers-color-scheme: light)");
+
+function effectiveTheme(mode = state.settings.theme) {
+  if (mode === "light" || mode === "dark") return mode;
+  return themeMediaQuery.matches ? "light" : "dark";
+}
+
+function applyTheme(mode = state.settings.theme) {
+  const normalized = ["system", "dark", "light"].includes(mode) ? mode : "system";
+  const effective = effectiveTheme(normalized);
+  document.documentElement.dataset.themeMode = normalized;
+  document.documentElement.dataset.theme = effective;
+  const metaTheme = document.querySelector('meta[name="theme-color"]');
+  if (metaTheme) metaTheme.content = effective === "light" ? "#f4f6f2" : "#111316";
+  const statusBar = document.querySelector('meta[name="apple-mobile-web-app-status-bar-style"]');
+  if (statusBar) statusBar.content = effective === "light" ? "default" : "black-translucent";
+  const quick = $("#themeQuickToggleButton");
+  if (quick) {
+    quick.textContent = effective === "light" ? "☾" : "☼";
+    quick.title = effective === "light" ? "切换到深色" : "切换到浅色";
+    quick.setAttribute("aria-label", quick.title);
+  }
+}
+
+function setThemeMode(mode, persist = true) {
+  state.settings.theme = ["system", "dark", "light"].includes(mode) ? mode : "system";
+  if (persist) saveState();
+  applyTheme(state.settings.theme);
 }
 
 function localDateISO(date = new Date()) {
@@ -2917,6 +2949,7 @@ function renderHistoryPage() {
 }
 
 function renderAll() {
+  applyTheme();
   renderExerciseSelects();
   renderSetRows();
   renderTemplates();
@@ -3197,6 +3230,7 @@ async function importData(file) {
         carbsGoal: Math.max(0, Number(data.settings?.carbsGoal) || 250),
         fatGoal: Math.max(0, Number(data.settings?.fatGoal) || 70),
         restSeconds: Math.min(600, Math.max(15, Number(data.settings?.restSeconds) || 120)),
+        theme: ["system", "dark", "light"].includes(data.settings?.theme) ? data.settings.theme : "system",
       },
       exercises: normalizeExercises(data.exercises),
       records: data.records,
@@ -3666,7 +3700,14 @@ function bindEvents() {
     showToast(wasEditing ? "动作已更新" : "动作已添加");
   });
 
+  $("#themeQuickToggleButton").addEventListener("click", () => {
+    const next = effectiveTheme() === "light" ? "dark" : "light";
+    setThemeMode(next);
+    showToast(next === "light" ? "已切换浅色主题" : "已切换深色主题");
+  });
+
   $("#settingsButton").addEventListener("click", () => {
+    $("#themeModeInput").value = state.settings.theme || "system";
     $("#calorieGoalInput").value = state.settings.calorieGoal;
     $("#proteinGoalInput").value = state.settings.proteinGoal;
     $("#carbsGoalInput").value = state.settings.carbsGoal;
@@ -3686,12 +3727,14 @@ function bindEvents() {
     const submitterValue = event.submitter?.value;
     if (submitterValue === "cancel") return;
     event.preventDefault();
+    state.settings.theme = ["system", "dark", "light"].includes($("#themeModeInput").value) ? $("#themeModeInput").value : "system";
     state.settings.calorieGoal = Math.max(800, Number($("#calorieGoalInput").value) || 2200);
     state.settings.proteinGoal = Math.max(0, Number($("#proteinGoalInput").value) || 0);
     state.settings.carbsGoal = Math.max(0, Number($("#carbsGoalInput").value) || 0);
     state.settings.fatGoal = Math.max(0, Number($("#fatGoalInput").value) || 0);
     state.settings.restSeconds = Math.min(600, Math.max(15, Number($("#restSecondsInput").value) || 120));
     saveState();
+    applyTheme();
     $("#settingsDialog").close();
     renderAll();
     showToast("设置已保存");
@@ -3701,8 +3744,13 @@ function bindEvents() {
 $("#foodDate").value = localDateISO();
 $("#bodyDate").value = localDateISO();
 $("#workoutDate").value = localDateISO();
+applyTheme();
 bindEvents();
 renderAll();
+
+themeMediaQuery.addEventListener?.("change", () => {
+  if ((state.settings.theme || "system") === "system") applyTheme("system");
+});
 
 if ('serviceWorker' in navigator && window.isSecureContext) {
   navigator.serviceWorker.register('./service-worker.js').catch(() => {});

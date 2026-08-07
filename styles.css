@@ -646,3 +646,108 @@ dialog::backdrop { background: rgba(0,0,0,.68); backdrop-filter: blur(4px); }
   .form-actions { grid-template-columns: 1fr; }
   .backup-actions { grid-template-columns: 1fr; }
 }
+
+/* Interface density + theme system */
+.topbar-actions { display:flex; align-items:center; gap:7px; }
+.fold-section { margin-top:12px; border:1px solid var(--line); border-radius:18px; background:var(--panel); overflow:hidden; }
+.fold-section.compact-fold { margin-top:10px; }
+.fold-summary { list-style:none; min-height:58px; display:flex; align-items:center; justify-content:space-between; gap:14px; padding:12px 14px; cursor:pointer; user-select:none; -webkit-tap-highlight-color:transparent; }
+.fold-summary::-webkit-details-marker { display:none; }
+.fold-summary > span { min-width:0; display:grid; gap:3px; }
+.fold-summary b { font-size:13px; letter-spacing:-.015em; }
+.fold-summary small { color:var(--muted); font-size:9px; line-height:1.4; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.fold-summary > i { flex:0 0 auto; color:var(--accent); font-size:9px; font-style:normal; font-weight:850; }
+.fold-summary > i::after { content:'  ▾'; }
+.fold-section[open] > .fold-summary { border-bottom:1px solid var(--line); }
+.fold-section[open] > .fold-summary > i { font-size:0; }
+.fold-section[open] > .fold-summary > i::before { content:'收起'; font-size:9px; }
+.fold-section[open] > .fold-summary > i::after { content:'  ▴'; font-size:9px; }
+.fold-content { padding:0 12px 12px; }
+.fold-content > :first-child { margin-top:12px; }
+.fold-content .section-block:first-child { margin-top:12px; }
+.settings-section-title { display:grid; gap:3px; }
+
+:root[data-theme="light"] {
+  color-scheme: light;
+  --bg:#f4f6f2;
+  --panel:#ffffff;
+  --panel-2:#eef1ec;
+  --panel-3:#e5eae3;
+  --text:#182019;
+  --muted:#68736c;
+  --line:#d8ded6;
+  --accent:#4f7f16;
+  --accent-strong:#3f6812;
+  --danger:#c54a40;
+  --shadow:0 18px 48px rgba(31,43,33,.10);
+}
+:root[data-theme="light"] body { background:radial-gradient(circle at 82% -8%, rgba(99,145,45,.10), transparent 27%), var(--bg); }
+:root[data-theme="light"] .topbar { background:linear-gradient(180deg, rgba(244,246,242,.97) 72%, rgba(244,246,242,0)); }
+:root[data-theme="light"] .icon-button,
+:root[data-theme="light"] input,
+:root[data-theme="light"] select,
+:root[data-theme="light"] .exercise-picker-button,
+:root[data-theme="light"] .food-entry-grid input { background:#fff; color:var(--text); }
+:root[data-theme="light"] .hero-card { background:linear-gradient(145deg,#ffffff,#f5f8f3); border-color:var(--line); box-shadow:0 14px 36px rgba(41,56,44,.09); }
+:root[data-theme="light"] .ring { background:conic-gradient(var(--accent) var(--progress), #dce2da 0); }
+:root[data-theme="light"] .ring::after { background:#fff; }
+:root[data-theme="light"] .dashboard-training-metrics div,
+:root[data-theme="light"] .compare-metrics > div,
+:root[data-theme="light"] .focus-values div,
+:root[data-theme="light"] .rep-pr-grid article,
+:root[data-theme="light"] .template-manager-card,
+:root[data-theme="light"] .template-exercise-edit-card,
+:root[data-theme="light"] .weekly-plan-row,
+:root[data-theme="light"] .creator-row,
+:root[data-theme="light"] .group-exercise-option,
+:root[data-theme="light"] .calculator-preview,
+:root[data-theme="light"] .exercise-search-wrap,
+:root[data-theme="light"] .exercise-pick-row,
+:root[data-theme="light"] .dashboard-plan-strip,
+:root[data-theme="light"] .food-quick-card,
+:root[data-theme="light"] .nutrition-shortcut-card,
+:root[data-theme="light"] .body-entry-card,
+:root[data-theme="light"] .body-record-row { background:#f8faf7; border-color:var(--line); }
+:root[data-theme="light"] .dashboard-training-card,
+:root[data-theme="light"] .set-card,
+:root[data-theme="light"] .workout-context-card,
+:root[data-theme="light"] .focus-metric-card,
+:root[data-theme="light"] .training-tools-card,
+:root[data-theme="light"] .progress-compare-card,
+:root[data-theme="light"] .chart-card,
+:root[data-theme="light"] .list-card,
+:root[data-theme="light"] .history-card,
+:root[data-theme="light"] .metric-card,
+:root[data-theme="light"] .analytics-toolbar,
+:root[data-theme="light"] .rep-pr-card,
+:root[data-theme="light"] .fold-section { background:#fff; border-color:var(--line); }
+:root[data-theme="light"] .today-plan-card { background:linear-gradient(145deg,rgba(75,142,185,.09),#fff 62%); }
+:root[data-theme="light"] .smart-training-card,
+:root[data-theme="light"] .template-card { background:linear-gradient(145deg,rgba(79,127,22,.08),#fff 62%); }
+:root[data-theme="light"] .recovery-advisor-card { background:linear-gradient(145deg,rgba(75,142,185,.08),#fff 62%); }
+:root[data-theme="light"] .progression-suggestion-card { background:linear-gradient(145deg,rgba(75,142,185,.06),#fff 62%); }
+:root[data-theme="light"] .feature-strip span { color:var(--accent); background:rgba(79,127,22,.08); border-color:rgba(79,127,22,.18); }
+:root[data-theme="light"] .secondary-button,
+:root[data-theme="light"] .metric-switch-button,
+:root[data-theme="light"] .set-type,
+:root[data-theme="light"] .complete-set,
+:root[data-theme="light"] .calendar-actions button,
+:root[data-theme="light"] .feedback-options button { background:var(--panel-2); color:var(--text); border-color:var(--line); }
+:root[data-theme="light"] .bottom-nav { background:rgba(255,255,255,.94); border-color:var(--line); box-shadow:0 12px 36px rgba(38,52,41,.14); }
+:root[data-theme="light"] dialog::backdrop { background:rgba(30,37,31,.34); }
+:root[data-theme="light"] .dialog-card { background:#fff; color:var(--text); border-color:var(--line); }
+:root[data-theme="light"] .progression-suggestion-card > strong,
+:root[data-theme="light"] .plate-total strong { color:var(--accent); }
+:root[data-theme="light"] .bodyweight-cell,
+:root[data-theme="light"] .template-bodyweight-label { background:rgba(62,132,170,.07); }
+:root[data-theme="light"] .training-calendar-weekdays span,
+:root[data-theme="light"] .calendar-day small,
+:root[data-theme="light"] .calendar-day > span { color:var(--muted); }
+:root[data-theme="light"] .calendar-day { background:#fff; border-color:var(--line); }
+:root[data-theme="light"] .rest-timer { box-shadow:0 12px 30px rgba(38,52,41,.18); }
+
+@media (max-width: 430px) {
+  .fold-summary { min-height:54px; padding:11px 12px; }
+  .fold-content { padding:0 9px 10px; }
+  .fold-summary small { max-width:235px; }
+}
