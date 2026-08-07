@@ -24,7 +24,7 @@
     })();
   </script>
   <link rel="manifest" href="manifest.webmanifest" />
-  <link rel="stylesheet" href="styles.css?v=16" />
+  <link rel="stylesheet" href="styles.css?v=17" />
 </head>
 <body>
   <div class="app-shell">
@@ -82,7 +82,7 @@
           <b>›</b>
         </article>
 
-        <section class="section-block">
+        <section class="section-block" data-module-key="dashboardChart">
           <div class="section-heading">
             <div>
               <p class="eyebrow">最近 7 天</p>
@@ -93,7 +93,7 @@
           <div class="mini-chart" id="weeklyChart"></div>
         </section>
 
-        <section class="section-block">
+        <section class="section-block" data-module-key="dashboardRecent">
           <div class="section-heading">
             <div>
               <p class="eyebrow">最近训练</p>
@@ -138,7 +138,7 @@
           </div>
         </div>
 
-        <details class="fold-section compact-fold">
+        <details class="fold-section compact-fold" data-module-key="nutritionShortcuts">
           <summary class="fold-summary"><span><b>常用与快速操作</b><small>复制前一天 · 常用食物 · 常用餐</small></span><i>展开</i></summary>
           <div class="fold-content">
         <div class="nutrition-quick-actions">
@@ -210,7 +210,7 @@
           <div id="foodEntries" class="stack-list"></div>
         </section>
 
-        <details class="fold-section">
+        <details class="fold-section" data-module-key="nutritionInsights">
           <summary class="fold-summary"><span><b>趋势与身体记录</b><small>最近摄入 · 7/30 天趋势 · 体重体脂</small></span><i>展开</i></summary>
           <div class="fold-content">
         <section class="section-block">
@@ -277,7 +277,7 @@
           </div>
         </div>
 
-        <details class="fold-section">
+        <details class="fold-section" data-module-key="trainingSmart">
           <summary class="fold-summary"><span><b>计划与智能训练</b><small>Smart Plan · 恢复顾问 · 模板</small></span><i>展开</i></summary>
           <div class="fold-content">
         <div class="smart-training-card">
@@ -354,7 +354,21 @@
           <article class="metric-card wide"><span>上次训练</span><strong class="last-workout-text" id="exerciseLastWorkout">暂无记录</strong></article>
         </div>
 
-        <details class="fold-section compact-fold">
+        <section class="exercise-mini-trend module-card" data-module-key="trainingTrend">
+          <div class="mini-trend-head">
+            <div><p class="eyebrow">EXERCISE TREND</p><h3>动作走势</h3></div>
+            <select id="trainingTrendMetric" aria-label="动作走势指标">
+              <option value="maxWeight">最高重量</option>
+              <option value="volume">训练容量</option>
+              <option value="reps">总次数</option>
+              <option value="sets">总组数</option>
+            </select>
+          </div>
+          <p class="muted" id="trainingTrendSummary">记录训练后会按日期形成折线。</p>
+          <div id="trainingExerciseTrendChart" class="mini-line-chart"></div>
+        </section>
+
+        <details class="fold-section compact-fold" data-module-key="trainingAdvanced">
           <summary class="fold-summary"><span><b>高级训练工具</b><small>进阶建议 · 实时对比 · 编组与计算器</small></span><i>展开</i></summary>
           <div class="fold-content">
         <article class="progression-suggestion-card" id="progressionSuggestionCard">
@@ -464,7 +478,7 @@
           <article><span>本月训练</span><strong id="progressMonthDays">0</strong><small>天</small></article>
         </div>
 
-        <details class="fold-section">
+        <details class="fold-section" data-module-key="analyticsRecovery">
           <summary class="fold-summary"><span><b>整体恢复与训练分布</b><small>同期对比 · 恢复 · 肌群负荷 · 日历</small></span><i>展开</i></summary>
           <div class="fold-content">
         <section class="progress-compare-grid">
@@ -571,7 +585,7 @@
           <div id="exerciseTrendChart" class="trend-chart"></div>
         </section>
 
-        <details class="fold-section compact-fold">
+        <details class="fold-section compact-fold" data-module-key="analyticsDetails">
           <summary class="fold-summary"><span><b>纪录与逐日明细</b><small>PR 时间线 · 每天每组与合计</small></span><i>展开</i></summary>
           <div class="fold-content">
         <section class="section-block compact">
@@ -862,10 +876,23 @@
         </select>
       </div>
       <div class="field-group">
+        <label for="exerciseRecoveryPrimaryInput">主要恢复部位</label>
+        <select id="exerciseRecoveryPrimaryInput">
+          <option>胸</option><option>背</option><option>肩前束</option><option>肩中束</option><option>肩后束</option><option>二头</option><option>三头</option><option>股四头</option><option>后链</option><option>臀</option><option>小腿</option><option>核心</option>
+        </select>
+      </div>
+      <div class="field-group">
+        <label>次要参与恢复部位</label>
+        <div class="recovery-muscle-options" id="exerciseSecondaryRecoveryInputs">
+          <label><input type="checkbox" value="胸">胸</label><label><input type="checkbox" value="背">背</label><label><input type="checkbox" value="肩前束">肩前束</label><label><input type="checkbox" value="肩中束">肩中束</label><label><input type="checkbox" value="肩后束">肩后束</label><label><input type="checkbox" value="二头">二头</label><label><input type="checkbox" value="三头">三头</label><label><input type="checkbox" value="股四头">股四头</label><label><input type="checkbox" value="后链">后链</label><label><input type="checkbox" value="臀">臀</label><label><input type="checkbox" value="小腿">小腿</label><label><input type="checkbox" value="核心">核心</label>
+        </div>
+      </div>
+      <p class="helper-text">恢复估算会把主要部位按完整负荷、次要部位按约 40% 负荷计入。例如杠铃卧推会同时影响胸、三头和肩前束。</p>
+      <div class="field-group">
         <label for="exerciseEquipmentInput">主要器械</label>
         <select id="exerciseEquipmentInput"><option value="barbell">杠铃</option><option value="dumbbell">哑铃</option><option value="machine">器械</option><option value="bodyweight">自重</option><option value="other">其他</option></select>
       </div>
-      <p class="helper-text">主肌群用于训练量分析；器械类型用于 Workout Creator 和自动计划筛选动作。</p>
+      <p class="helper-text">主肌群用于训练量分类；恢复部位用于负荷恢复估算；器械类型用于 Workout Creator 和自动计划筛选动作。</p>
       <button class="primary-button" id="exerciseFormSubmitButton" value="default">添加动作</button>
     </form>
   </dialog>
@@ -892,6 +919,23 @@
         </select>
       </div>
       <p class="helper-text">“跟随系统”会自动匹配 iPhone / 电脑的浅色或深色外观。</p>
+      <div class="settings-divider"></div>
+      <div class="settings-section-title">
+        <p class="eyebrow">LAYOUT</p>
+        <h3>页面模块</h3>
+      </div>
+      <p class="helper-text">只勾选你平时真的会看的模块。未勾选的功能不会删除数据，只是从主界面隐藏，需要时随时在这里加回来。</p>
+      <div class="module-picker" id="uiModuleInputs">
+        <label><input type="checkbox" data-ui-module="dashboardChart">首页 · 最近 7 天容量图</label>
+        <label><input type="checkbox" data-ui-module="dashboardRecent">首页 · 最近训练</label>
+        <label><input type="checkbox" data-ui-module="nutritionShortcuts">饮食 · 常用食物与常用餐</label>
+        <label><input type="checkbox" data-ui-module="nutritionInsights">饮食 · 趋势与身体记录</label>
+        <label><input type="checkbox" data-ui-module="trainingSmart">训练 · 计划与智能训练</label>
+        <label><input type="checkbox" data-ui-module="trainingTrend">训练 · 动作日期折线</label>
+        <label><input type="checkbox" data-ui-module="trainingAdvanced">训练 · 高级工具</label>
+        <label><input type="checkbox" data-ui-module="analyticsRecovery">趋势 · 恢复与训练分布</label>
+        <label><input type="checkbox" data-ui-module="analyticsDetails">趋势 · PR 时间线与逐日明细</label>
+      </div>
       <div class="settings-divider"></div>
       <div class="field-group">
         <label for="calorieGoalInput">每日摄入目标（kcal）</label>
@@ -935,6 +979,6 @@
   </div>
 
   <div id="toast" class="toast" role="status"></div>
-  <script src="app.js?v=16"></script>
+  <script src="app.js?v=17"></script>
 </body>
 </html>

@@ -666,6 +666,21 @@ dialog::backdrop { background: rgba(0,0,0,.68); backdrop-filter: blur(4px); }
 .fold-content > :first-child { margin-top:12px; }
 .fold-content .section-block:first-child { margin-top:12px; }
 .settings-section-title { display:grid; gap:3px; }
+.module-hidden { display:none !important; }
+.module-picker { display:grid; grid-template-columns:1fr 1fr; gap:7px; }
+.module-picker label, .recovery-muscle-options label { display:flex; align-items:center; gap:7px; min-height:38px; padding:8px 10px; border:1px solid var(--line); border-radius:12px; background:var(--panel-2); color:var(--text); font-size:11px; font-weight:700; }
+.module-picker input, .recovery-muscle-options input { width:auto; margin:0; accent-color:var(--accent); }
+.recovery-muscle-options { display:grid; grid-template-columns:repeat(3,1fr); gap:6px; }
+.recovery-muscle-options label { min-height:34px; padding:7px 8px; font-size:10px; }
+.exercise-mini-trend { margin:10px 0 2px; padding:14px; border:1px solid var(--line); border-radius:17px; background:var(--panel); }
+.mini-trend-head { display:flex; align-items:center; justify-content:space-between; gap:10px; }
+.mini-trend-head select { width:auto; min-width:104px; padding:8px 9px; font-size:10px; }
+.exercise-mini-trend > .muted { margin-top:5px; font-size:10px; }
+.mini-line-chart { min-height:132px; margin-top:8px; }
+.mini-line-chart svg { display:block; width:100%; height:132px; overflow:visible; }
+.feature-strip { display:none; }
+.page-title { margin-bottom:14px; }
+.section-block { margin-top:18px; }
 
 :root[data-theme="light"] {
   color-scheme: light;
@@ -720,7 +735,8 @@ dialog::backdrop { background: rgba(0,0,0,.68); backdrop-filter: blur(4px); }
 :root[data-theme="light"] .metric-card,
 :root[data-theme="light"] .analytics-toolbar,
 :root[data-theme="light"] .rep-pr-card,
-:root[data-theme="light"] .fold-section { background:#fff; border-color:var(--line); }
+:root[data-theme="light"] .fold-section,
+:root[data-theme="light"] .exercise-mini-trend { background:#fff; border-color:var(--line); }
 :root[data-theme="light"] .today-plan-card { background:linear-gradient(145deg,rgba(75,142,185,.09),#fff 62%); }
 :root[data-theme="light"] .smart-training-card,
 :root[data-theme="light"] .template-card { background:linear-gradient(145deg,rgba(79,127,22,.08),#fff 62%); }
@@ -745,9 +761,17 @@ dialog::backdrop { background: rgba(0,0,0,.68); backdrop-filter: blur(4px); }
 :root[data-theme="light"] .calendar-day > span { color:var(--muted); }
 :root[data-theme="light"] .calendar-day { background:#fff; border-color:var(--line); }
 :root[data-theme="light"] .rest-timer { box-shadow:0 12px 30px rgba(38,52,41,.18); }
+:root[data-theme="light"] .module-picker label,
+:root[data-theme="light"] .recovery-muscle-options label { background:#f8faf7; }
+:root[data-theme="light"] .chart-grid { stroke:#d9dfd7; }
+:root[data-theme="light"] .chart-dot { fill:#fff; }
 
 @media (max-width: 430px) {
   .fold-summary { min-height:54px; padding:11px 12px; }
   .fold-content { padding:0 9px 10px; }
   .fold-summary small { max-width:235px; }
+  .module-picker { grid-template-columns:1fr; }
+  .recovery-muscle-options { grid-template-columns:repeat(2,1fr); }
+  .exercise-mini-trend { padding:12px; }
+  .mini-trend-head { align-items:flex-start; }
 }

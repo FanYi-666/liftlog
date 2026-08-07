@@ -1,5 +1,5 @@
 const STORAGE_KEY = "liftlog-v1";
-const SCHEMA_VERSION = 12;
+const SCHEMA_VERSION = 13;
 
 const defaultState = {
   schemaVersion: SCHEMA_VERSION,
@@ -10,17 +10,28 @@ const defaultState = {
     fatGoal: 70,
     restSeconds: 120,
     theme: "system",
+    uiModules: {
+      dashboardChart: false,
+      dashboardRecent: false,
+      nutritionShortcuts: false,
+      nutritionInsights: false,
+      trainingSmart: false,
+      trainingTrend: true,
+      trainingAdvanced: false,
+      analyticsRecovery: false,
+      analyticsDetails: false,
+    },
   },
   exercises: [
-    { id: "bench-press", name: "杠铃卧推", mode: "weighted", primaryMuscle: "胸", equipment: "barbell" },
-    { id: "squat", name: "深蹲", mode: "weighted", primaryMuscle: "股四头", equipment: "barbell" },
-    { id: "deadlift", name: "硬拉", mode: "weighted", primaryMuscle: "后链", equipment: "barbell" },
-    { id: "lat-pulldown", name: "高位下拉", mode: "weighted", primaryMuscle: "背", equipment: "machine" },
-    { id: "seated-row", name: "坐姿划船", mode: "weighted", primaryMuscle: "背", equipment: "machine" },
-    { id: "shoulder-press", name: "肩推", mode: "weighted", primaryMuscle: "肩", equipment: "machine" },
-    { id: "biceps-curl", name: "二头弯举", mode: "weighted", primaryMuscle: "二头", equipment: "dumbbell" },
-    { id: "triceps-pushdown", name: "三头下压", mode: "weighted", primaryMuscle: "三头", equipment: "machine" },
-    { id: "push-up", name: "俯卧撑", mode: "bodyweight", primaryMuscle: "胸", equipment: "bodyweight" },
+    { id: "bench-press", name: "杠铃卧推", mode: "weighted", primaryMuscle: "胸", equipment: "barbell", recoveryPrimary: "胸", recoverySecondary: ["三头", "肩前束"] },
+    { id: "squat", name: "深蹲", mode: "weighted", primaryMuscle: "股四头", equipment: "barbell", recoveryPrimary: "股四头", recoverySecondary: ["臀", "后链", "核心"] },
+    { id: "deadlift", name: "硬拉", mode: "weighted", primaryMuscle: "后链", equipment: "barbell", recoveryPrimary: "后链", recoverySecondary: ["臀", "背", "核心"] },
+    { id: "lat-pulldown", name: "高位下拉", mode: "weighted", primaryMuscle: "背", equipment: "machine", recoveryPrimary: "背", recoverySecondary: ["二头", "肩后束"] },
+    { id: "seated-row", name: "坐姿划船", mode: "weighted", primaryMuscle: "背", equipment: "machine", recoveryPrimary: "背", recoverySecondary: ["二头", "肩后束"] },
+    { id: "shoulder-press", name: "肩推", mode: "weighted", primaryMuscle: "肩", equipment: "machine", recoveryPrimary: "肩前束", recoverySecondary: ["肩中束", "三头"] },
+    { id: "biceps-curl", name: "二头弯举", mode: "weighted", primaryMuscle: "二头", equipment: "dumbbell", recoveryPrimary: "二头", recoverySecondary: [] },
+    { id: "triceps-pushdown", name: "三头下压", mode: "weighted", primaryMuscle: "三头", equipment: "machine", recoveryPrimary: "三头", recoverySecondary: [] },
+    { id: "push-up", name: "俯卧撑", mode: "bodyweight", primaryMuscle: "胸", equipment: "bodyweight", recoveryPrimary: "胸", recoverySecondary: ["三头", "肩前束"] },
   ],
   records: [],
   foodRecords: [],
@@ -88,8 +99,63 @@ function inferExerciseMode(name, mode) {
 }
 
 const MUSCLE_GROUPS = ["胸", "背", "肩", "二头", "三头", "股四头", "后链", "臀", "小腿", "核心", "其他"];
+const RECOVERY_MUSCLES = ["胸", "背", "肩前束", "肩中束", "肩后束", "二头", "三头", "股四头", "后链", "臀", "小腿", "核心"];
+const UI_MODULE_DEFAULTS = {
+  dashboardChart: false,
+  dashboardRecent: false,
+  nutritionShortcuts: false,
+  nutritionInsights: false,
+  trainingSmart: false,
+  trainingTrend: true,
+  trainingAdvanced: false,
+  analyticsRecovery: false,
+  analyticsDetails: false,
+};
 const EQUIPMENT_TYPES = ["barbell", "dumbbell", "machine", "bodyweight", "other"];
 const EQUIPMENT_LABELS = { barbell: "杠铃", dumbbell: "哑铃", machine: "器械", bodyweight: "自重", other: "其他" };
+
+function normalizeUiModules(modules) {
+  const source = modules && typeof modules === "object" ? modules : {};
+  return Object.fromEntries(Object.entries(UI_MODULE_DEFAULTS).map(([key, fallback]) => [key, source[key] == null ? fallback : Boolean(source[key])]));
+}
+
+function inferRecoveryPrimary(name, primaryMuscle, saved) {
+  if (RECOVERY_MUSCLES.includes(saved)) return saved;
+  const text = String(name || "").toLowerCase();
+  if (primaryMuscle === "肩") {
+    if (/后束|rear|reverse|face pull|面拉/.test(text)) return "肩后束";
+    if (/侧平举|lateral/.test(text)) return "肩中束";
+    return "肩前束";
+  }
+  return RECOVERY_MUSCLES.includes(primaryMuscle) ? primaryMuscle : "核心";
+}
+
+function inferRecoverySecondary(name, id, primaryMuscle, saved) {
+  if (Array.isArray(saved)) return [...new Set(saved.filter((muscle) => RECOVERY_MUSCLES.includes(muscle)))].slice(0, 4);
+  const text = `${id || ""} ${name || ""}`.toLowerCase();
+  if (/bench|卧推/.test(text)) return ["三头", "肩前束"];
+  if (/push-?up|俯卧撑/.test(text)) return ["三头", "肩前束"];
+  if (/squat|深蹲|腿举/.test(text)) return ["臀", "后链", "核心"];
+  if (/deadlift|硬拉|rdl/.test(text)) return ["臀", "背", "核心"];
+  if (/pulldown|下拉|引体/.test(text)) return ["二头", "肩后束"];
+  if (/row|划船/.test(text)) return ["二头", "肩后束"];
+  if (/shoulder|肩推|推举|overhead/.test(text)) return ["肩中束", "三头"];
+  if (/face pull|面拉|反向飞鸟/.test(text)) return ["背"];
+  return [];
+}
+
+function exerciseRecoveryProfile(exercise) {
+  if (!exercise) return [];
+  const primary = inferRecoveryPrimary(exercise.name, exercise.primaryMuscle, exercise.recoveryPrimary);
+  const secondary = inferRecoverySecondary(exercise.name, exercise.id, exercise.primaryMuscle, exercise.recoverySecondary)
+    .filter((muscle) => muscle !== primary);
+  return [{ muscle: primary, factor: 1 }, ...secondary.map((muscle) => ({ muscle, factor: .4 }))];
+}
+
+function recoveryForTrainingMuscle(primaryMuscle, recovery) {
+  if (primaryMuscle === "肩") return Math.min(recovery["肩前束"] ?? 100, recovery["肩中束"] ?? 100, recovery["肩后束"] ?? 100);
+  return recovery[primaryMuscle] ?? 100;
+}
 
 function inferEquipment(name, mode, savedEquipment) {
   if (EQUIPMENT_TYPES.includes(savedEquipment)) return savedEquipment;
@@ -118,7 +184,7 @@ function inferPrimaryMuscle(name, id, savedMuscle) {
   const text = `${id || ""} ${name || ""}`.toLowerCase().replace(/\s+/g, "");
   if (/bench|push-?up|卧推|俯卧撑|飞鸟|夹胸/.test(text)) return "胸";
   if (/lat|row|pull-?up|下拉|划船|引体/.test(text)) return "背";
-  if (/shoulder|press|raise|肩推|推举|侧平举|前平举/.test(text)) return "肩";
+  if (/shoulder|press|raise|肩推|推举|侧平举|前平举|后束|反向飞鸟|面拉|rear delt|reverse fly|face pull/.test(text)) return "肩";
   if (/biceps|curl|二头|弯举/.test(text)) return "二头";
   if (/triceps|pushdown|三头|臂屈伸/.test(text)) return "三头";
   if (/squat|legpress|extension|深蹲|腿举|腿屈伸/.test(text)) return "股四头";
@@ -133,10 +199,13 @@ function normalizeExercises(exercises) {
   const source = Array.isArray(exercises) && exercises.length ? exercises : clone(defaultState.exercises);
   const normalized = source.map((exercise) => {
     const mode = inferExerciseMode(exercise.name, exercise.mode);
+    const primaryMuscle = inferPrimaryMuscle(exercise.name, exercise.id, exercise.primaryMuscle);
     return {
       ...exercise,
       mode,
-      primaryMuscle: inferPrimaryMuscle(exercise.name, exercise.id, exercise.primaryMuscle),
+      primaryMuscle,
+      recoveryPrimary: inferRecoveryPrimary(exercise.name, primaryMuscle, exercise.recoveryPrimary),
+      recoverySecondary: inferRecoverySecondary(exercise.name, exercise.id, primaryMuscle, exercise.recoverySecondary),
       equipment: inferEquipment(exercise.name, mode, exercise.equipment),
       restSeconds: Number(exercise.restSeconds) >= 30 ? Math.min(600, Number(exercise.restSeconds)) : null,
       focusMetric: exercise.focusMetric || (mode === "bodyweight" ? "reps" : "volume"),
@@ -144,7 +213,7 @@ function normalizeExercises(exercises) {
     };
   });
   if (!normalized.some((exercise) => exercise.id === "push-up" || exercise.name === "俯卧撑")) {
-    normalized.push({ id: "push-up", name: "俯卧撑", mode: "bodyweight", primaryMuscle: "胸", equipment: "bodyweight", restSeconds: 90, focusMetric: "reps", barWeight: 20 });
+    normalized.push({ id: "push-up", name: "俯卧撑", mode: "bodyweight", primaryMuscle: "胸", equipment: "bodyweight", recoveryPrimary: "胸", recoverySecondary: ["三头", "肩前束"], restSeconds: 90, focusMetric: "reps", barWeight: 20 });
   }
   return normalized;
 }
@@ -258,6 +327,7 @@ function loadState() {
     const fatGoal = Math.max(0, Number(saved.settings?.fatGoal) || defaultState.settings.fatGoal);
     const restSeconds = Math.min(600, Math.max(15, Number(saved.settings?.restSeconds) || defaultState.settings.restSeconds));
     const theme = ["system", "dark", "light"].includes(saved.settings?.theme) ? saved.settings.theme : "system";
+    const uiModules = normalizeUiModules(saved.settings?.uiModules);
     const records = Array.isArray(saved.records)
       ? saved.records.map((record) => ({
           id: record.id,
@@ -281,7 +351,7 @@ function loadState() {
 
     return {
       schemaVersion: SCHEMA_VERSION,
-      settings: { calorieGoal, proteinGoal, carbsGoal, fatGoal, restSeconds, theme },
+      settings: { calorieGoal, proteinGoal, carbsGoal, fatGoal, restSeconds, theme, uiModules },
       exercises: normalizeExercises(saved.exercises),
       records,
       foodRecords: normalizeFoodRecords(saved.foodRecords),
@@ -309,6 +379,13 @@ const themeMediaQuery = window.matchMedia("(prefers-color-scheme: light)");
 function effectiveTheme(mode = state.settings.theme) {
   if (mode === "light" || mode === "dark") return mode;
   return themeMediaQuery.matches ? "light" : "dark";
+}
+
+function renderUiModules() {
+  const modules = normalizeUiModules(state.settings.uiModules);
+  state.settings.uiModules = modules;
+  $$('[data-module-key]').forEach((element) => element.classList.toggle('module-hidden', !modules[element.dataset.moduleKey]));
+  $$('[data-ui-module]').forEach((input) => { input.checked = Boolean(modules[input.dataset.uiModule]); });
 }
 
 function applyTheme(mode = state.settings.theme) {
@@ -632,6 +709,7 @@ function updateCurrentExerciseName() {
   $("#exercisePickerName").textContent = exercise?.name || "选择动作";
   $("#exercisePickerMeta").textContent = exercise ? exerciseModeLabel(exercise) : "搜索或从最近动作中选择";
   renderExercisePr();
+  renderTrainingExerciseTrend();
   renderSetRows();
   renderFocusMetric();
   renderExerciseTools();
@@ -701,7 +779,8 @@ function renderExerciseManager() {
     title.textContent = exercise.name;
     const count = state.records.filter((record) => record.exerciseId === exercise.id).length;
     const meta = document.createElement("span");
-    meta.textContent = `${exerciseModeLabel(exercise)} · ${exercise.primaryMuscle || "其他"} · ${EQUIPMENT_LABELS[exercise.equipment] || "其他"} · ${count} 条记录`;
+    const recoveryLabel = exerciseRecoveryProfile(exercise).map((item) => item.muscle).join(" + ");
+    meta.textContent = `${exerciseModeLabel(exercise)} · ${exercise.primaryMuscle || "其他"} · 恢复 ${recoveryLabel} · ${count} 条记录`;
     copy.append(title, meta);
     const edit = document.createElement("button");
     edit.type = "button";
@@ -721,7 +800,12 @@ function openExerciseEditor(exerciseId = null, origin = "training") {
   $("#exerciseFormSubmitButton").textContent = exercise ? "保存动作" : "添加动作";
   $("#exerciseNameInput").value = exercise?.name || "";
   $("#exerciseModeInput").value = exercise?.mode === "bodyweight" ? "bodyweight" : "weighted";
-  $("#exerciseMuscleInput").value = exercise?.primaryMuscle || inferPrimaryMuscle(exercise?.name || "", exercise?.id || "", "");
+  const primaryMuscle = exercise?.primaryMuscle || inferPrimaryMuscle(exercise?.name || "", exercise?.id || "", "");
+  const recoveryPrimary = inferRecoveryPrimary(exercise?.name || "", primaryMuscle, exercise?.recoveryPrimary);
+  const recoverySecondary = inferRecoverySecondary(exercise?.name || "", exercise?.id || "", primaryMuscle, exercise?.recoverySecondary).filter((muscle) => muscle !== recoveryPrimary);
+  $("#exerciseMuscleInput").value = primaryMuscle;
+  $("#exerciseRecoveryPrimaryInput").value = recoveryPrimary;
+  $$("#exerciseSecondaryRecoveryInputs input[type='checkbox']").forEach((input) => { input.checked = recoverySecondary.includes(input.value); });
   $("#exerciseEquipmentInput").value = exercise?.equipment || inferEquipment(exercise?.name || "", exercise?.mode || "weighted", exercise?.equipment);
   $("#exerciseEquipmentInput").disabled = exercise?.mode === "bodyweight";
   if ($("#exercisePickerDialog").open) $("#exercisePickerDialog").close();
@@ -745,6 +829,73 @@ function renderExercisePr() {
       ? `${formatDate(last.date)} · ${sumSets(last.sets)}组 · ${sumReps(last.sets)}次`
       : `${formatDate(last.date)} · ${sumSets(last.sets)}组 · ${formatNumber(sumVolume(last.sets))}kg`
     : "暂无记录";
+}
+
+function renderTrainingExerciseTrend() {
+  const root = $("#trainingExerciseTrendChart");
+  const metricSelect = $("#trainingTrendMetric");
+  const summary = $("#trainingTrendSummary");
+  if (!root || !metricSelect || !summary) return;
+
+  const exerciseId = $("#exerciseSelect").value;
+  const exercise = exerciseById(exerciseId);
+  if (!exercise) {
+    root.innerHTML = '<div class="empty-state compact-empty">先选择一个训练动作。</div>';
+    summary.textContent = "选择动作后显示日期走势。";
+    return;
+  }
+
+  const bodyweight = exercise.mode === "bodyweight";
+  if (bodyweight && ["maxWeight", "volume"].includes(metricSelect.value)) metricSelect.value = "reps";
+  $$("#trainingTrendMetric option").forEach((option) => {
+    option.disabled = bodyweight && ["maxWeight", "volume"].includes(option.value);
+  });
+  const metricKey = metricSelect.value || (bodyweight ? "reps" : "maxWeight");
+  const metric = ANALYTICS_METRICS[metricKey] || ANALYTICS_METRICS.reps;
+  const grouped = [...groupByDate(state.records.filter((record) => record.exerciseId === exerciseId)).entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([date, records]) => ({ date, value: metricValueForRecords(records, metricKey) }))
+    .filter((item) => item.value > 0)
+    .slice(-12);
+
+  if (!grouped.length) {
+    root.innerHTML = '<div class="empty-state compact-empty">还没有可绘制的数据。</div>';
+    summary.textContent = `${exercise.name} · 记录几次训练后会按日期形成折线。`;
+    return;
+  }
+
+  const first = grouped[0];
+  const latest = grouped[grouped.length - 1];
+  const delta = latest.value - first.value;
+  const unit = metric.unit;
+  summary.textContent = `${exercise.name} · 最近 ${grouped.length} 个训练日 · 最新 ${formatNumber(latest.value, metricKey === "maxWeight" ? 1 : 0)} ${unit}${grouped.length > 1 ? ` · 较起点 ${delta >= 0 ? "+" : ""}${formatNumber(delta, metricKey === "maxWeight" ? 1 : 0)} ${unit}` : ""}`;
+
+  const width = 620;
+  const height = 156;
+  const pad = { top: 14, right: 14, bottom: 28, left: 42 };
+  const plotW = width - pad.left - pad.right;
+  const plotH = height - pad.top - pad.bottom;
+  const times = grouped.map((item) => dateFromISO(item.date).getTime());
+  const minTime = Math.min(...times);
+  const maxTime = Math.max(...times);
+  const maxVal = Math.max(...grouped.map((item) => item.value), 1);
+  const minVal = Math.min(...grouped.map((item) => item.value), 0);
+  const spread = Math.max(1, maxVal - minVal);
+  const x = (time, index) => pad.left + (maxTime === minTime ? plotW / 2 : ((time - minTime) / (maxTime - minTime)) * plotW);
+  const y = (value) => pad.top + plotH - ((value - minVal) / spread) * plotH;
+  const points = grouped.map((item, index) => `${x(times[index], index)},${y(item.value)}`).join(" ");
+  const yTicks = [0, .5, 1].map((ratio) => {
+    const value = minVal + spread * ratio;
+    const yy = y(value);
+    return `<line class="chart-grid" x1="${pad.left}" y1="${yy}" x2="${width - pad.right}" y2="${yy}"/><text class="chart-axis-label" x="${pad.left - 7}" y="${yy + 3}" text-anchor="end">${formatNumber(value, metricKey === "maxWeight" ? 1 : 0)}</text>`;
+  }).join("");
+  const dots = grouped.map((item, index) => `<circle class="chart-dot" cx="${x(times[index], index)}" cy="${y(item.value)}" r="4"><title>${formatDate(item.date, true)}：${formatNumber(item.value, metricKey === "maxWeight" ? 1 : 0)} ${unit}</title></circle>`).join("");
+  const labels = grouped.map((item, index) => {
+    if (grouped.length > 6 && index !== 0 && index !== grouped.length - 1 && index % Math.ceil(grouped.length / 5) !== 0) return "";
+    const label = new Intl.DateTimeFormat("zh-CN", { month: "numeric", day: "numeric" }).format(dateFromISO(item.date));
+    return `<text class="chart-axis-label" x="${x(times[index], index)}" y="150" text-anchor="middle">${label}</text>`;
+  }).join("");
+  root.innerHTML = `<svg viewBox="0 0 ${width} ${height}" role="img" aria-label="${exercise.name}${metric.label}按日期折线图">${yTicks}<polyline class="chart-line" points="${points}"/>${dots}${labels}</svg>`;
 }
 
 function renderWorkoutDay() {
@@ -1542,21 +1693,24 @@ function averageRecordRpe(record) {
 function muscleRecoveryAt(targetDate = new Date()) {
   const target = new Date(targetDate);
   const targetIso = localDateISO(target);
-  const fatigue = Object.fromEntries(MUSCLE_GROUPS.map((muscle) => [muscle, 0]));
+  const fatigue = Object.fromEntries(RECOVERY_MUSCLES.map((muscle) => [muscle, 0]));
   state.records.forEach((record) => {
     if (record.date > targetIso) return;
     const exercise = exerciseById(record.exerciseId);
-    const muscle = MUSCLE_GROUPS.includes(exercise?.primaryMuscle) ? exercise.primaryMuscle : "其他";
     const sets = sumSets(record.sets);
-    if (!sets) return;
+    if (!sets || !exercise) return;
     const hours = Math.max(0, (target - recordLoadMoment(record)) / 36e5);
     if (hours >= 72) return;
     const rpeFactor = Math.min(1.05, Math.max(.6, averageRecordRpe(record) / 10));
     const feedbackFactor = record.feedback === "hard" ? 1.2 : record.feedback === "easy" ? .85 : 1;
     const decay = Math.max(0, 1 - hours / 72);
-    fatigue[muscle] += sets * rpeFactor * feedbackFactor * 14 * decay;
+    const baseLoad = sets * rpeFactor * feedbackFactor * 14 * decay;
+    exerciseRecoveryProfile(exercise).forEach(({ muscle, factor }) => {
+      if (fatigue[muscle] == null) return;
+      fatigue[muscle] += baseLoad * factor;
+    });
   });
-  return Object.fromEntries(MUSCLE_GROUPS.map((muscle) => [muscle, Math.max(0, Math.round(100 - Math.min(100, fatigue[muscle])))]));
+  return Object.fromEntries(RECOVERY_MUSCLES.map((muscle) => [muscle, Math.max(0, Math.round(100 - Math.min(100, fatigue[muscle])))]));
 }
 
 function recoveryStatus(value) {
@@ -1575,7 +1729,10 @@ function recoveryRecommendedMuscles(limit = 3) {
     .map((exercise) => exercise.primaryMuscle));
   return MUSCLE_GROUPS
     .filter((muscle) => muscle !== "其他" && available.has(muscle))
-    .map((muscle) => ({ muscle, recovery: recovery[muscle], weekSets: week[muscle] || 0, score: recovery[muscle] - (week[muscle] || 0) * 2.5 }))
+    .map((muscle) => {
+      const muscleRecovery = recoveryForTrainingMuscle(muscle, recovery);
+      return { muscle, recovery: muscleRecovery, weekSets: week[muscle] || 0, score: muscleRecovery - (week[muscle] || 0) * 2.5 };
+    })
     .sort((a, b) => b.score - a.score || b.recovery - a.recovery)
     .slice(0, limit);
 }
@@ -1596,9 +1753,9 @@ function renderRecoveryAdvisor() {
       ? "先按计划训练，之后会形成恢复估算"
       : ready.length ? `今天优先：${ready.map((item) => item.muscle).join(" + ")}` : "今天整体负荷偏高，建议降低训练量";
     $("#recoveryRecommendationBody").textContent = !hasHistory
-      ? "恢复分数会根据最近训练时间、正式组数、RPE 与训练反馈逐步建立。"
+      ? "恢复分数会根据最近训练时间、正式组数、RPE、训练反馈，以及动作的主要/次要参与部位逐步建立。"
       : ready.length
-        ? `这些肌群当前恢复分数较高，同时本周训练量相对不过量。分数按约 72 小时负荷衰减估算。`
+        ? `这些肌群当前恢复分数较高，同时本周训练量相对不过量。每个动作会同时计入主要与次要参与部位，再按约 72 小时负荷衰减估算。`
         : "近期多个可用肌群仍在恢复中；如果仍训练，优先减少正式组或选择技术性较轻的训练。";
     const best = ranked[0]?.recovery ?? 100;
     const badge = $("#recoveryRecommendationBadge");
@@ -1608,7 +1765,7 @@ function renderRecoveryAdvisor() {
 
   const grid = $("#muscleRecoveryGrid");
   if (grid) {
-    grid.innerHTML = MUSCLE_GROUPS.filter((muscle) => muscle !== "其他").map((muscle) => {
+    grid.innerHTML = RECOVERY_MUSCLES.map((muscle) => {
       const value = recovery[muscle];
       const status = recoveryStatus(value);
       return `<article class="recovery-muscle-card ${status.level}"><div><span>${muscle}</span><small>${status.label}</small></div><strong>${value}%</strong><i><b style="width:${value}%"></b></i></article>`;
@@ -1633,19 +1790,33 @@ function templateMuscles(template) {
 }
 
 function templateRecoveryScore(template, readiness) {
-  const muscles = templateMuscles(template);
-  if (!muscles.length) return 40;
-  return muscles.reduce((sum, muscle) => sum + (readiness[muscle] ?? 100), 0) / muscles.length;
+  let weightedScore = 0;
+  let totalWeight = 0;
+  (template?.exercises || []).forEach((item) => {
+    const exercise = exerciseById(item.exerciseId);
+    if (!exercise) return;
+    const workingSets = (item.sets || []).filter((set) => (set.type || "normal") !== "warmup").length || 3;
+    exerciseRecoveryProfile(exercise).forEach(({ muscle, factor }) => {
+      const weight = workingSets * factor;
+      weightedScore += (readiness[muscle] ?? 100) * weight;
+      totalWeight += weight;
+    });
+  });
+  return totalWeight ? weightedScore / totalWeight : 40;
 }
 
 function applyTemplateFatigue(readiness, template) {
-  const setsByMuscle = Object.fromEntries(MUSCLE_GROUPS.map((muscle) => [muscle, 0]));
+  const loadByMuscle = Object.fromEntries(RECOVERY_MUSCLES.map((muscle) => [muscle, 0]));
   (template?.exercises || []).forEach((item) => {
-    const muscle = exerciseById(item.exerciseId)?.primaryMuscle || "其他";
-    setsByMuscle[muscle] += (item.sets || []).filter((set) => (set.type || "normal") !== "warmup").length || 3;
+    const exercise = exerciseById(item.exerciseId);
+    if (!exercise) return;
+    const workingSets = (item.sets || []).filter((set) => (set.type || "normal") !== "warmup").length || 3;
+    exerciseRecoveryProfile(exercise).forEach(({ muscle, factor }) => {
+      if (loadByMuscle[muscle] != null) loadByMuscle[muscle] += workingSets * factor;
+    });
   });
-  MUSCLE_GROUPS.forEach((muscle) => {
-    readiness[muscle] = Math.max(0, (readiness[muscle] ?? 100) - Math.min(65, setsByMuscle[muscle] * 9));
+  RECOVERY_MUSCLES.forEach((muscle) => {
+    readiness[muscle] = Math.max(0, (readiness[muscle] ?? 100) - Math.min(65, loadByMuscle[muscle] * 9));
   });
 }
 
@@ -1659,7 +1830,7 @@ function buildAdaptivePlanSuggestions() {
   let previousTemplateId = "";
 
   for (let offset = 0; offset < 7; offset += 1) {
-    if (offset > 0) MUSCLE_GROUPS.forEach((muscle) => { readiness[muscle] = Math.min(100, readiness[muscle] + 32); });
+    if (offset > 0) RECOVERY_MUSCLES.forEach((muscle) => { readiness[muscle] = Math.min(100, readiness[muscle] + 32); });
     const date = addDays(today, offset);
     const dateIso = localDateISO(date);
     const entry = basePlan[currentWeekdayIndex(date)];
@@ -2950,6 +3121,7 @@ function renderHistoryPage() {
 
 function renderAll() {
   applyTheme();
+  renderUiModules();
   renderExerciseSelects();
   renderSetRows();
   renderTemplates();
@@ -3231,6 +3403,7 @@ async function importData(file) {
         fatGoal: Math.max(0, Number(data.settings?.fatGoal) || 70),
         restSeconds: Math.min(600, Math.max(15, Number(data.settings?.restSeconds) || 120)),
         theme: ["system", "dark", "light"].includes(data.settings?.theme) ? data.settings.theme : "system",
+        uiModules: normalizeUiModules(data.settings?.uiModules),
       },
       exercises: normalizeExercises(data.exercises),
       records: data.records,
@@ -3637,6 +3810,7 @@ function bindEvents() {
     analyticsMetricKey = button.dataset.metric;
     renderAnalytics();
   });
+  $("#trainingTrendMetric").addEventListener("change", renderTrainingExerciseTrend);
 
   $("#exerciseDialog").addEventListener("close", () => {
     if (exerciseEditorOrigin === "manager" && !$("#exerciseManagerDialog").open) {
@@ -3650,6 +3824,25 @@ function bindEvents() {
     const bodyweight = $("#exerciseModeInput").value === "bodyweight";
     $("#exerciseEquipmentInput").disabled = bodyweight;
     if (bodyweight) $("#exerciseEquipmentInput").value = "bodyweight";
+  });
+  $("#exerciseRecoveryPrimaryInput").addEventListener("change", () => {
+    const primary = $("#exerciseRecoveryPrimaryInput").value;
+    $$("#exerciseSecondaryRecoveryInputs input[type='checkbox']").forEach((input) => {
+      if (input.value === primary) input.checked = false;
+    });
+  });
+  $("#exerciseSecondaryRecoveryInputs").addEventListener("change", (event) => {
+    const input = event.target.closest("input[type='checkbox']");
+    if (!input) return;
+    if (input.checked && input.value === $("#exerciseRecoveryPrimaryInput").value) {
+      input.checked = false;
+      return showToast("主要恢复部位不需要重复选择");
+    }
+    const checked = $$("#exerciseSecondaryRecoveryInputs input[type='checkbox']:checked");
+    if (checked.length > 4) {
+      input.checked = false;
+      showToast("次要恢复部位最多选择 4 个");
+    }
   });
 
   $("#exerciseForm").addEventListener("submit", (event) => {
@@ -3668,6 +3861,13 @@ function bindEvents() {
     }
     const mode = $("#exerciseModeInput").value === "bodyweight" ? "bodyweight" : "weighted";
     const primaryMuscle = MUSCLE_GROUPS.includes($("#exerciseMuscleInput").value) ? $("#exerciseMuscleInput").value : "其他";
+    const recoveryPrimary = RECOVERY_MUSCLES.includes($("#exerciseRecoveryPrimaryInput").value)
+      ? $("#exerciseRecoveryPrimaryInput").value
+      : inferRecoveryPrimary(name, primaryMuscle, "");
+    const recoverySecondary = $$("#exerciseSecondaryRecoveryInputs input[type='checkbox']:checked")
+      .map((input) => input.value)
+      .filter((muscle) => RECOVERY_MUSCLES.includes(muscle) && muscle !== recoveryPrimary)
+      .slice(0, 4);
     const equipment = mode === "bodyweight" ? "bodyweight" : (EQUIPMENT_TYPES.includes($("#exerciseEquipmentInput").value) ? $("#exerciseEquipmentInput").value : "other");
     let exercise;
     if (editingExerciseId) {
@@ -3676,11 +3876,13 @@ function bindEvents() {
       exercise.name = name;
       exercise.mode = mode;
       exercise.primaryMuscle = primaryMuscle;
+      exercise.recoveryPrimary = recoveryPrimary;
+      exercise.recoverySecondary = recoverySecondary;
       exercise.equipment = equipment;
       if (!validFocusMetrics(exercise.id).includes(exercise.focusMetric)) exercise.focusMetric = mode === "bodyweight" ? "reps" : "volume";
     } else {
       exercise = {
-        id: slugId(name), name, mode, primaryMuscle, equipment,
+        id: slugId(name), name, mode, primaryMuscle, equipment, recoveryPrimary, recoverySecondary,
         restSeconds: null,
         focusMetric: mode === "bodyweight" ? "reps" : "volume",
         barWeight: 20,
@@ -3708,6 +3910,7 @@ function bindEvents() {
 
   $("#settingsButton").addEventListener("click", () => {
     $("#themeModeInput").value = state.settings.theme || "system";
+    renderUiModules();
     $("#calorieGoalInput").value = state.settings.calorieGoal;
     $("#proteinGoalInput").value = state.settings.proteinGoal;
     $("#carbsGoalInput").value = state.settings.carbsGoal;
@@ -3728,6 +3931,7 @@ function bindEvents() {
     if (submitterValue === "cancel") return;
     event.preventDefault();
     state.settings.theme = ["system", "dark", "light"].includes($("#themeModeInput").value) ? $("#themeModeInput").value : "system";
+    state.settings.uiModules = normalizeUiModules(Object.fromEntries($$("[data-ui-module]").map((input) => [input.dataset.uiModule, input.checked])));
     state.settings.calorieGoal = Math.max(800, Number($("#calorieGoalInput").value) || 2200);
     state.settings.proteinGoal = Math.max(0, Number($("#proteinGoalInput").value) || 0);
     state.settings.carbsGoal = Math.max(0, Number($("#carbsGoalInput").value) || 0);
