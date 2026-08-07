@@ -24,7 +24,7 @@
     })();
   </script>
   <link rel="manifest" href="manifest.webmanifest" />
-  <link rel="stylesheet" href="styles.css?v=19" />
+  <link rel="stylesheet" href="styles.css?v=20" />
 </head>
 <body>
   <div class="app-shell">
@@ -281,7 +281,7 @@
           <div>
             <p class="eyebrow">SMART PLAN</p>
             <h3 id="smartProfileSummary">增肌 · 中级 · 每周 4 天 · 60 分钟</h3>
-            <p class="muted">按目标、水平、时间和器械生成训练；也可以只生成今天这一场。</p>
+            <p class="muted">按目标、频率和器械生成计划；每个训练日都能自由选择胸、背、腿、后链、肩、手臂、核心等重点。</p>
           </div>
           <div class="smart-training-actions">
             <button class="secondary-button" id="smartPlanButton" type="button">训练目标 / 自动周计划</button>
@@ -673,7 +673,8 @@
         </div>
         <button class="icon-button" id="closeWeeklyPlanButton" type="button" aria-label="关闭">×</button>
       </div>
-      <p class="helper-text">先决定当天是“训练”还是“休息”。只有训练日才需要选择自由训练/模板和具体时间；休息日不保存时间。</p>
+      <p class="helper-text">这里负责安排星期和时间；训练内容来自你的模板。需要重新按胸 / 背 / 腿 / 后链 / 肩 / 手臂等部位编排时，使用“调整训练分化”。</p>
+      <button class="secondary-button" id="weeklySplitBuilderButton" type="button">调整训练分化</button>
       <div id="weeklyPlanRows" class="weekly-plan-rows"></div>
       <button class="primary-button" id="saveWeeklyPlanButton" type="button">保存周计划</button>
     </div>
@@ -692,7 +693,10 @@
         <div class="field-group"><label for="trainingMinutesInput">单次时长</label><select id="trainingMinutesInput"><option value="30">30 分钟</option><option value="45">45 分钟</option><option value="60">60 分钟</option><option value="75">75 分钟</option><option value="90">90 分钟</option></select></div>
       </div>
       <div class="field-group"><label>可用器械</label><div class="equipment-chips" id="trainingEquipmentInputs"><label><input type="checkbox" value="barbell">杠铃</label><label><input type="checkbox" value="dumbbell">哑铃</label><label><input type="checkbox" value="machine">器械</label><label><input type="checkbox" value="bodyweight">自重</label><label><input type="checkbox" value="other">其他</label></div></div>
-      <p class="helper-text">自动生成时优先保留你在“周计划”里已经选好的训练日；如果数量不足，会自动均匀补足。你之后仍可自由改训练日和时间。</p>
+      <div class="plan-builder-head"><div><strong>每个训练日的重点</strong><small>可自由组合，推荐方案以主要肌群每周约 2 次规律刺激为目标</small></div><button class="text-button" id="resetSmartSplitButton" type="button">恢复推荐分化</button></div>
+      <div id="smartPlanDayTargets" class="plan-target-editor"></div>
+      <p id="smartPlanCoverage" class="plan-coverage-note"></p>
+      <p class="helper-text">生成时会优先保留你在“周计划”里已经选好的训练日；如果数量不足，会自动均匀补足。分化和训练日之后都可以继续修改。</p>
       <div class="smart-plan-actions"><button class="secondary-button" id="saveTrainingProfileButton" type="button">只保存设置</button><button class="primary-button" id="generateWeeklyPlanButton" type="button">生成一周训练计划</button></div>
     </div>
   </dialog>
@@ -701,7 +705,7 @@
     <div class="dialog-card smart-plan-dialog-card">
       <div class="dialog-head"><div><p class="eyebrow">WORKOUT CREATOR</p><h2>快速生成今天训练</h2></div><button class="icon-button" id="closeWorkoutCreatorButton" type="button" aria-label="关闭">×</button></div>
       <div class="smart-profile-grid">
-        <div class="field-group"><label for="creatorTargetInput">训练重点</label><select id="creatorTargetInput"><option value="full">全身</option><option value="upper">上肢</option><option value="lower">下肢</option><option value="胸">胸</option><option value="背">背</option><option value="肩">肩</option><option value="二头">二头</option><option value="三头">三头</option><option value="股四头">股四头</option><option value="后链">后链</option></select></div>
+        <div class="field-group"><label for="creatorTargetInput">训练重点</label><select id="creatorTargetInput"><option value="full">全身</option><option value="upper">上肢</option><option value="lower">下肢</option><option value="chest">胸</option><option value="back">背</option><option value="legs">腿</option><option value="posterior">后链</option><option value="glutes">臀</option><option value="shoulders">肩部</option><option value="arms">手臂</option><option value="biceps">二头</option><option value="triceps">三头</option><option value="core">核心</option><option value="calves">小腿</option></select></div>
         <div class="field-group"><label for="creatorMinutesInput">可用时间</label><select id="creatorMinutesInput"><option value="30">30 分钟</option><option value="45">45 分钟</option><option value="60">60 分钟</option><option value="75">75 分钟</option></select></div>
       </div>
       <div id="creatorPreview" class="creator-preview"></div>
@@ -911,10 +915,12 @@
       </section>
 
       <section class="onboarding-step" data-onboarding-step="2">
-        <p class="eyebrow">训练模板</p>
-        <h2>从哪一场开始</h2>
-        <p class="onboarding-copy">LiftLog 会按你的目标和频率生成一周模板。选择你希望第一个训练日优先安排的内容。</p>
-        <div id="onboardingTemplateChoices" class="onboarding-template-list"></div>
+        <p class="eyebrow">训练分化</p>
+        <h2>决定每一天练什么</h2>
+        <p class="onboarding-copy">先给你一个按频率均衡覆盖主要肌群的方案。每个训练日都可以自由改成胸、背、腿、后链、肩、手臂、核心等组合。</p>
+        <div class="plan-builder-head"><span>本周训练部位</span><button class="text-button" id="resetOnboardingSplitButton" type="button">恢复推荐分化</button></div>
+        <div id="onboardingDayTargets" class="plan-target-editor"></div>
+        <p id="onboardingCoverage" class="plan-coverage-note"></p>
         <div class="onboarding-actions"><button class="secondary-button" type="button" data-onboarding-back="1">返回</button><button class="primary-button" type="button" data-onboarding-next="3">下一步</button></div>
       </section>
 
@@ -1025,6 +1031,6 @@
   </div>
 
   <div id="toast" class="toast" role="status"></div>
-  <script src="app.js?v=19"></script>
+  <script src="app.js?v=20"></script>
 </body>
 </html>

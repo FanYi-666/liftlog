@@ -1,5 +1,5 @@
 const STORAGE_KEY = "liftlog-v1";
-const SCHEMA_VERSION = 14;
+const SCHEMA_VERSION = 15;
 
 const defaultState = {
   schemaVersion: SCHEMA_VERSION,
@@ -35,6 +35,21 @@ const defaultState = {
     { id: "biceps-curl", name: "二头弯举", mode: "weighted", primaryMuscle: "二头", equipment: "dumbbell", recoveryPrimary: "二头", recoverySecondary: [] },
     { id: "triceps-pushdown", name: "三头下压", mode: "weighted", primaryMuscle: "三头", equipment: "machine", recoveryPrimary: "三头", recoverySecondary: [] },
     { id: "push-up", name: "俯卧撑", mode: "bodyweight", primaryMuscle: "胸", equipment: "bodyweight", recoveryPrimary: "胸", recoverySecondary: ["三头", "肩前束"] },
+    { id: "incline-dumbbell-press", name: "上斜哑铃卧推", mode: "weighted", primaryMuscle: "胸", equipment: "dumbbell", recoveryPrimary: "胸", recoverySecondary: ["三头", "肩前束"] },
+    { id: "chest-fly", name: "夹胸 / 飞鸟", mode: "weighted", primaryMuscle: "胸", equipment: "machine", recoveryPrimary: "胸", recoverySecondary: [] },
+    { id: "barbell-row", name: "杠铃划船", mode: "weighted", primaryMuscle: "背", equipment: "barbell", recoveryPrimary: "背", recoverySecondary: ["二头", "肩后束"] },
+    { id: "pull-up", name: "引体向上", mode: "bodyweight", primaryMuscle: "背", equipment: "bodyweight", recoveryPrimary: "背", recoverySecondary: ["二头", "肩后束"] },
+    { id: "lateral-raise", name: "侧平举", mode: "weighted", primaryMuscle: "肩", equipment: "dumbbell", recoveryPrimary: "肩中束", recoverySecondary: [] },
+    { id: "rear-delt-fly", name: "反向飞鸟", mode: "weighted", primaryMuscle: "肩", equipment: "machine", recoveryPrimary: "肩后束", recoverySecondary: ["背"] },
+    { id: "leg-press", name: "腿举", mode: "weighted", primaryMuscle: "股四头", equipment: "machine", recoveryPrimary: "股四头", recoverySecondary: ["臀"] },
+    { id: "leg-extension", name: "腿屈伸", mode: "weighted", primaryMuscle: "股四头", equipment: "machine", recoveryPrimary: "股四头", recoverySecondary: [] },
+    { id: "leg-curl", name: "腿弯举", mode: "weighted", primaryMuscle: "后链", equipment: "machine", recoveryPrimary: "后链", recoverySecondary: [] },
+    { id: "romanian-deadlift", name: "罗马尼亚硬拉", mode: "weighted", primaryMuscle: "后链", equipment: "barbell", recoveryPrimary: "后链", recoverySecondary: ["臀", "核心"] },
+    { id: "hip-thrust", name: "臀推", mode: "weighted", primaryMuscle: "臀", equipment: "barbell", recoveryPrimary: "臀", recoverySecondary: ["后链"] },
+    { id: "calf-raise", name: "提踵", mode: "weighted", primaryMuscle: "小腿", equipment: "machine", recoveryPrimary: "小腿", recoverySecondary: [] },
+    { id: "plank", name: "平板支撑", mode: "bodyweight", primaryMuscle: "核心", equipment: "bodyweight", recoveryPrimary: "核心", recoverySecondary: [] },
+    { id: "cable-crunch", name: "绳索卷腹", mode: "weighted", primaryMuscle: "核心", equipment: "machine", recoveryPrimary: "核心", recoverySecondary: [] },
+    { id: "overhead-triceps-extension", name: "过顶三头伸展", mode: "weighted", primaryMuscle: "三头", equipment: "machine", recoveryPrimary: "三头", recoverySecondary: [] },
   ],
   records: [],
   foodRecords: [],
@@ -48,6 +63,8 @@ const defaultState = {
     daysPerWeek: 4,
     sessionMinutes: 60,
     equipment: ["barbell", "dumbbell", "machine", "bodyweight"],
+    splitStyle: "recommended",
+    dayTargets: [],
   },
   planOverrides: [],
 };
@@ -116,6 +133,44 @@ const UI_MODULE_DEFAULTS = {
 };
 const EQUIPMENT_TYPES = ["barbell", "dumbbell", "machine", "bodyweight", "other"];
 const EQUIPMENT_LABELS = { barbell: "杠铃", dumbbell: "哑铃", machine: "器械", bodyweight: "自重", other: "其他" };
+const PLAN_TARGETS = {
+  chest: { label: "胸", muscles: ["胸"] },
+  back: { label: "背", muscles: ["背"] },
+  legs: { label: "腿", muscles: ["股四头", "臀", "小腿"] },
+  posterior: { label: "后链", muscles: ["后链", "臀", "核心"] },
+  glutes: { label: "臀", muscles: ["臀"] },
+  calves: { label: "小腿", muscles: ["小腿"] },
+  shoulders: { label: "肩部", muscles: ["肩"] },
+  arms: { label: "手臂", muscles: ["二头", "三头"] },
+  biceps: { label: "二头", muscles: ["二头"] },
+  triceps: { label: "三头", muscles: ["三头"] },
+  core: { label: "核心", muscles: ["核心"] },
+  upper: { label: "上肢", muscles: ["胸", "背", "肩", "二头", "三头"] },
+  lower: { label: "下肢", muscles: ["股四头", "后链", "臀", "小腿", "核心"] },
+  full: { label: "全身", muscles: ["胸", "背", "肩", "股四头", "后链", "臀", "核心"] },
+};
+const PLAN_TARGET_KEYS = Object.keys(PLAN_TARGETS);
+const MAJOR_PLAN_MUSCLES = ["胸", "背", "肩", "股四头", "后链", "臀"];
+const COMPOUND_EXERCISE_IDS = new Set(["bench-press", "push-up", "incline-dumbbell-press", "barbell-row", "lat-pulldown", "seated-row", "pull-up", "shoulder-press", "squat", "leg-press", "deadlift", "romanian-deadlift", "hip-thrust"]);
+
+function normalizeDayTargets(dayTargets, daysPerWeek) {
+  if (!Array.isArray(dayTargets)) return [];
+  return dayTargets.slice(0, daysPerWeek).map((targets) => [...new Set((Array.isArray(targets) ? targets : []).filter((key) => PLAN_TARGET_KEYS.includes(key)))].slice(0, 4));
+}
+
+function expandPlanTargets(targets) {
+  return [...new Set((targets || []).flatMap((key) => PLAN_TARGETS[key]?.muscles || []))];
+}
+
+function planTargetLabel(targets) {
+  return (targets || []).map((key) => PLAN_TARGETS[key]?.label).filter(Boolean).join(" + ") || "自由训练";
+}
+
+function sameDayTargets(a, b) {
+  const left = (a || []).map((items) => [...items].sort());
+  const right = (b || []).map((items) => [...items].sort());
+  return JSON.stringify(left) === JSON.stringify(right);
+}
 
 function normalizeUiModules(modules) {
   const source = modules && typeof modules === "object" ? modules : {};
@@ -202,12 +257,15 @@ function inferEquipment(name, mode, savedEquipment) {
 function normalizeTrainingProfile(profile) {
   const source = profile || {};
   const equipment = Array.isArray(source.equipment) ? source.equipment.filter((item) => EQUIPMENT_TYPES.includes(item)) : [];
+  const daysPerWeek = Math.min(6, Math.max(2, Number(source.daysPerWeek) || 4));
   return {
     goal: ["hypertrophy", "strength", "fatloss"].includes(source.goal) ? source.goal : "hypertrophy",
     level: ["beginner", "intermediate", "advanced"].includes(source.level) ? source.level : "intermediate",
-    daysPerWeek: Math.min(6, Math.max(2, Number(source.daysPerWeek) || 4)),
+    daysPerWeek,
     sessionMinutes: [30, 45, 60, 75, 90].includes(Number(source.sessionMinutes)) ? Number(source.sessionMinutes) : 60,
     equipment: equipment.length ? equipment : ["barbell", "dumbbell", "machine", "bodyweight"],
+    splitStyle: source.splitStyle === "custom" ? "custom" : "recommended",
+    dayTargets: normalizeDayTargets(source.dayTargets, daysPerWeek),
   };
 }
 
@@ -228,7 +286,10 @@ function inferPrimaryMuscle(name, id, savedMuscle) {
 }
 
 function normalizeExercises(exercises) {
-  const source = Array.isArray(exercises) && exercises.length ? exercises : clone(defaultState.exercises);
+  const source = Array.isArray(exercises) && exercises.length ? clone(exercises) : clone(defaultState.exercises);
+  defaultState.exercises.forEach((builtIn) => {
+    if (!source.some((exercise) => exercise.id === builtIn.id)) source.push(clone(builtIn));
+  });
   const normalized = source.map((exercise) => {
     const mode = inferExerciseMode(exercise.name, exercise.mode);
     const primaryMuscle = inferPrimaryMuscle(exercise.name, exercise.id, exercise.primaryMuscle);
@@ -244,9 +305,6 @@ function normalizeExercises(exercises) {
       barWeight: Number(exercise.barWeight) > 0 ? Number(exercise.barWeight) : 20,
     };
   });
-  if (!normalized.some((exercise) => exercise.id === "push-up" || exercise.name === "俯卧撑")) {
-    normalized.push({ id: "push-up", name: "俯卧撑", mode: "bodyweight", primaryMuscle: "胸", equipment: "bodyweight", recoveryPrimary: "胸", recoverySecondary: ["三头", "肩前束"], restSeconds: 90, focusMetric: "reps", barWeight: 20 });
-  }
   return normalized;
 }
 
@@ -1477,7 +1535,7 @@ const TRAINING_LEVEL_LABELS = { beginner: "新手", intermediate: "中级", adva
 function renderSmartProfileSummary() {
   const profile = normalizeTrainingProfile(state.trainingProfile);
   state.trainingProfile = profile;
-  if ($("#smartProfileSummary")) $("#smartProfileSummary").textContent = `${TRAINING_GOAL_LABELS[profile.goal]} · ${TRAINING_LEVEL_LABELS[profile.level]} · 每周 ${profile.daysPerWeek} 天 · ${profile.sessionMinutes} 分钟`;
+  if ($("#smartProfileSummary")) $("#smartProfileSummary").textContent = `${TRAINING_GOAL_LABELS[profile.goal]} · ${TRAINING_LEVEL_LABELS[profile.level]} · 每周 ${profile.daysPerWeek} 天 · ${profile.splitStyle === "custom" ? "自定义分化" : "均衡分化"}`;
 }
 
 function openSmartPlanDialog() {
@@ -1487,22 +1545,29 @@ function openSmartPlanDialog() {
   $("#trainingDaysInput").value = String(profile.daysPerWeek);
   $("#trainingMinutesInput").value = String(profile.sessionMinutes);
   $$("#trainingEquipmentInputs input").forEach((input) => { input.checked = profile.equipment.includes(input.value); });
+  renderPlanTargetEditor("#smartPlanDayTargets", "#smartPlanCoverage", profile.daysPerWeek, profile.dayTargets);
   $("#smartPlanDialog").showModal();
 }
 
 function profileFromDialog() {
+  const daysPerWeek = Number($("#trainingDaysInput").value) || 4;
+  const dayTargets = readPlanTargetEditor("#smartPlanDayTargets");
   return normalizeTrainingProfile({
     goal: $("#trainingGoalInput").value,
     level: $("#trainingLevelInput").value,
-    daysPerWeek: Number($("#trainingDaysInput").value),
+    daysPerWeek,
     sessionMinutes: Number($("#trainingMinutesInput").value),
     equipment: $$("#trainingEquipmentInputs input:checked").map((input) => input.value),
+    splitStyle: sameDayTargets(dayTargets, recommendedDayTargets(daysPerWeek)) ? "recommended" : "custom",
+    dayTargets,
   });
 }
 
 function saveTrainingProfileOnly() {
   if (!$$('#trainingEquipmentInputs input:checked').length) return showToast("至少选择一种可用器械");
-  state.trainingProfile = profileFromDialog();
+  const profile = profileFromDialog();
+  if (profile.dayTargets.some((targets) => !targets.length)) return showToast("每个训练日至少选择一个训练部位");
+  state.trainingProfile = profile;
   saveState();
   renderSmartProfileSummary();
   renderRecoveryAdvisor();
@@ -1513,37 +1578,62 @@ function saveTrainingProfileOnly() {
 function trainingPrescription(profile, exercise) {
   const advanced = profile.level === "advanced";
   const beginner = profile.level === "beginner";
-  if (exercise?.mode === "bodyweight") return { sets: beginner ? 2 : advanced ? 4 : 3, reps: profile.goal === "strength" ? 8 : profile.goal === "fatloss" ? 15 : 12 };
-  if (profile.goal === "strength") return { sets: beginner ? 3 : advanced ? 5 : 4, reps: 5 };
+  if (exercise?.mode === "bodyweight") return { sets: beginner ? 3 : 4, reps: profile.goal === "strength" ? 8 : profile.goal === "fatloss" ? 15 : 12 };
+  if (profile.goal === "strength") {
+    const compound = COMPOUND_EXERCISE_IDS.has(exercise?.id);
+    return { sets: beginner ? 2 : advanced ? 4 : 3, reps: compound ? 5 : 8 };
+  }
   if (profile.goal === "fatloss") return { sets: beginner ? 2 : 3, reps: 12 };
-  return { sets: beginner ? 2 : advanced ? 4 : 3, reps: 8 };
+  return { sets: beginner ? 3 : 4, reps: 8 };
 }
 
-function routineBlueprint(days) {
-  if (days <= 2) return [
-    { name: "全身 A", muscles: ["胸", "背", "股四头", "后链", "肩", "核心"] },
-    { name: "全身 B", muscles: ["背", "胸", "股四头", "臀", "二头", "三头"] },
-  ];
-  if (days === 3) return [
-    { name: "Push", muscles: ["胸", "肩", "三头"] },
-    { name: "Pull", muscles: ["背", "二头", "后链"] },
-    { name: "Legs", muscles: ["股四头", "后链", "臀", "小腿", "核心"] },
-  ];
-  if (days === 4) return [
-    { name: "Upper A", muscles: ["胸", "背", "肩", "二头", "三头"] },
-    { name: "Lower A", muscles: ["股四头", "后链", "臀", "小腿", "核心"] },
-    { name: "Upper B", muscles: ["背", "胸", "肩", "三头", "二头"] },
-    { name: "Lower B", muscles: ["后链", "股四头", "臀", "核心", "小腿"] },
-  ];
-  const base = [
-    { name: "Push", muscles: ["胸", "肩", "三头"] },
-    { name: "Pull", muscles: ["背", "二头", "后链"] },
-    { name: "Legs", muscles: ["股四头", "后链", "臀", "小腿"] },
-    { name: "Upper", muscles: ["胸", "背", "肩", "二头", "三头"] },
-    { name: "Lower", muscles: ["股四头", "后链", "臀", "核心"] },
-    { name: "Full Body", muscles: ["胸", "背", "股四头", "后链", "肩", "核心"] },
-  ];
-  return base.slice(0, days);
+function recommendedDayTargets(days) {
+  if (days <= 2) return [["full"], ["full"]];
+  if (days === 3) return [["upper"], ["lower"], ["full"]];
+  if (days === 4) return [["upper"], ["lower"], ["upper"], ["lower"]];
+  if (days === 5) return [["chest", "shoulders", "triceps"], ["back", "biceps"], ["legs", "posterior", "core"], ["upper"], ["lower"]];
+  return [["chest", "shoulders", "triceps"], ["back", "biceps"], ["legs", "posterior", "core"], ["chest", "shoulders", "triceps"], ["back", "biceps"], ["legs", "posterior", "core"]];
+}
+
+function routineBlueprint(days, dayTargets = null) {
+  const normalized = normalizeDayTargets(dayTargets, days);
+  const targets = normalized.length === days && normalized.every((item) => item.length) ? normalized : recommendedDayTargets(days);
+  return targets.map((targetKeys, index) => {
+    const label = planTargetLabel(targetKeys);
+    const repeated = targets.filter((item) => planTargetLabel(item) === label).length > 1;
+    const repeatIndex = targets.slice(0, index + 1).filter((item) => planTargetLabel(item) === label).length;
+    return {
+      name: repeated ? `${label} ${String.fromCharCode(64 + repeatIndex)}` : label,
+      targets: targetKeys,
+      muscles: expandPlanTargets(targetKeys),
+    };
+  });
+}
+
+function planCoverage(dayTargets) {
+  const counts = Object.fromEntries(MAJOR_PLAN_MUSCLES.map((muscle) => [muscle, 0]));
+  (dayTargets || []).forEach((targets) => {
+    const muscles = new Set(expandPlanTargets(targets));
+    MAJOR_PLAN_MUSCLES.forEach((muscle) => { if (muscles.has(muscle)) counts[muscle] += 1; });
+  });
+  return counts;
+}
+
+function planCoverageMessage(dayTargets) {
+  const counts = planCoverage(dayTargets);
+  const low = Object.entries(counts).filter(([, count]) => count < 2).map(([muscle, count]) => `${muscle}${count}次`);
+  const weekdays = preferredTrainingDays(dayTargets?.length || 0);
+  const overlaps = [];
+  for (let index = 1; index < (dayTargets || []).length; index += 1) {
+    if ((weekdays[index] ?? 7) - (weekdays[index - 1] ?? 0) !== 1) continue;
+    const previous = new Set(expandPlanTargets(dayTargets[index - 1]));
+    const repeated = expandPlanTargets(dayTargets[index]).filter((muscle) => MAJOR_PLAN_MUSCLES.includes(muscle) && previous.has(muscle));
+    if (repeated.length) overlaps.push(`${WEEKDAY_NAMES[weekdays[index - 1]]}/${WEEKDAY_NAMES[weekdays[index]]}重复${[...new Set(repeated)].join("、")}`);
+  }
+  if (low.length || overlaps.length) {
+    return `${low.length ? `覆盖提醒：${low.join("、")}。` : ""}${overlaps.length ? ` 连续日提醒：${overlaps.join("；")}。` : ""}建议优先让主要肌群获得规律刺激并避免连续高负荷重复；你仍可以保留自定义安排。`;
+  }
+  return "主要肌群本周都获得至少 2 次计划刺激，连续训练日也没有明显重复高负荷部位。";
 }
 
 function representativeWorkingWeight(sets) {
@@ -1558,17 +1648,27 @@ function latestWorkingWeight(exerciseId) {
   return last ? representativeWorkingWeight(last.sets) : 0;
 }
 
-function generatedTemplateFromMuscles(name, muscles, profile, minutes = profile.sessionMinutes) {
-  const maxExercises = minutes <= 30 ? 4 : minutes <= 45 ? 5 : minutes <= 60 ? 6 : minutes <= 75 ? 7 : 8;
+function generatedTemplateFromMuscles(name, muscles, profile, minutes = profile.sessionMinutes, variantIndex = 0) {
+  const timeMax = minutes <= 30 ? 4 : minutes <= 45 ? 5 : minutes <= 60 ? 6 : minutes <= 75 ? 7 : 8;
+  const baseMax = muscles.length >= 7 && minutes >= 60 ? Math.max(timeMax, 7) : timeMax;
+  const maxExercises = profile.goal === "strength" ? Math.min(baseMax, 5) : baseMax;
   const available = state.exercises.filter((exercise) => profile.equipment.includes(exercise.equipment || inferEquipment(exercise.name, exercise.mode, exercise.equipment)));
   const selected = [];
-  muscles.forEach((muscle) => {
-    const candidate = available.find((exercise) => exercise.primaryMuscle === muscle && !selected.some((item) => item.id === exercise.id));
-    if (candidate && selected.length < maxExercises) selected.push(candidate);
-  });
-  available.filter((exercise) => muscles.includes(exercise.primaryMuscle)).forEach((exercise) => {
-    if (selected.length < maxExercises && !selected.some((item) => item.id === exercise.id)) selected.push(exercise);
-  });
+  const muscleCounts = Object.fromEntries(muscles.map((muscle) => [muscle, 0]));
+  const smallMuscles = new Set(["二头", "三头", "核心", "小腿"]);
+  const capForMuscle = (muscle) => smallMuscles.has(muscle) ? 2 : (muscles.length === 1 ? 3 : 2);
+  const addCandidate = (muscle, round = 0) => {
+    if (selected.length >= maxExercises || (muscleCounts[muscle] || 0) >= capForMuscle(muscle)) return;
+    const candidates = available.filter((exercise) => exercise.primaryMuscle === muscle && !selected.some((item) => item.id === exercise.id));
+    if (!candidates.length) return;
+    const compounds = candidates.filter((exercise) => COMPOUND_EXERCISE_IDS.has(exercise.id));
+    const pool = round === 0 && compounds.length ? compounds : candidates;
+    const candidate = pool[(variantIndex + round) % pool.length];
+    selected.push(candidate);
+    muscleCounts[muscle] = (muscleCounts[muscle] || 0) + 1;
+  };
+  muscles.forEach((muscle) => addCandidate(muscle, 0));
+  for (let round = 1; round <= 2 && selected.length < maxExercises; round += 1) muscles.forEach((muscle) => addCandidate(muscle, round));
   return {
     id: crypto.randomUUID?.() || `smart-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
     name,
@@ -1576,6 +1676,7 @@ function generatedTemplateFromMuscles(name, muscles, profile, minutes = profile.
     createdAt: new Date().toISOString(),
     exercises: selected.slice(0, maxExercises).map((exercise) => {
       const prescription = trainingPrescription(profile, exercise);
+      if (muscles.length >= 3) prescription.sets = Math.min(prescription.sets, 3);
       const weight = exercise.mode === "bodyweight" ? 0 : latestWorkingWeight(exercise.id);
       return {
         exerciseId: exercise.id,
@@ -1596,30 +1697,98 @@ function preferredTrainingDays(count) {
   return result.sort((a, b) => a - b);
 }
 
-function applySmartWeeklyPlan(profile, preferredStartIndex = 0) {
-  const baseBlueprint = routineBlueprint(profile.daysPerWeek);
-  const start = Math.min(Math.max(0, Number(preferredStartIndex) || 0), Math.max(0, baseBlueprint.length - 1));
-  const blueprint = [...baseBlueprint.slice(start), ...baseBlueprint.slice(0, start)];
-  const templates = blueprint.map((item) => generatedTemplateFromMuscles(`${item.name} · ${TRAINING_GOAL_LABELS[profile.goal]}`, item.muscles, profile));
+function applySmartWeeklyPlan(profile, dayTargets = null) {
+  const normalizedProfile = normalizeTrainingProfile(profile);
+  const customTargets = normalizeDayTargets(dayTargets ?? normalizedProfile.dayTargets, normalizedProfile.daysPerWeek);
+  const resolvedTargets = customTargets.length === normalizedProfile.daysPerWeek && customTargets.every((item) => item.length)
+    ? customTargets
+    : recommendedDayTargets(normalizedProfile.daysPerWeek);
+  const blueprint = routineBlueprint(normalizedProfile.daysPerWeek, resolvedTargets);
+  const templates = blueprint.map((item, index) => {
+    const template = generatedTemplateFromMuscles(`${item.name} · ${TRAINING_GOAL_LABELS[normalizedProfile.goal]}`, item.muscles, normalizedProfile, normalizedProfile.sessionMinutes, index);
+    template.planTargets = item.targets;
+    return template;
+  });
   if (!templates.some((template) => template.exercises.length)) return false;
   const oldPlan = normalizeWeeklyPlan(state.weeklyPlan);
-  const days = preferredTrainingDays(profile.daysPerWeek);
+  const days = preferredTrainingDays(normalizedProfile.daysPerWeek);
   state.templates = state.templates.filter((template) => template.generatedBy !== "smart-plan").concat(templates);
   state.weeklyPlan = Array.from({ length: 7 }, (_, dayIndex) => {
     const position = days.indexOf(dayIndex);
     if (position < 0) return { dayIndex, isTrainingDay: false, templateId: "", reminderTime: "" };
     const previous = oldPlan[dayIndex];
-    return { dayIndex, isTrainingDay: true, templateId: templates[position % templates.length].id, reminderTime: previous?.reminderTime || "18:00" };
+    return { dayIndex, isTrainingDay: true, templateId: templates[position].id, reminderTime: previous?.reminderTime || "18:00" };
   });
-  state.trainingProfile = profile;
+  const splitStyle = sameDayTargets(resolvedTargets, recommendedDayTargets(normalizedProfile.daysPerWeek)) ? "recommended" : "custom";
+  state.trainingProfile = normalizeTrainingProfile({ ...normalizedProfile, splitStyle, dayTargets: resolvedTargets });
   state.planOverrides = [];
   return true;
+}
+
+const PLAN_TARGET_EDITOR_KEYS = ["chest", "back", "legs", "posterior", "glutes", "shoulders", "arms", "biceps", "triceps", "core", "calves", "upper", "lower", "full"];
+
+function readPlanTargetEditor(rootId) {
+  const root = $(rootId);
+  if (!root) return [];
+  return [...root.querySelectorAll("[data-plan-day]")].map((row) => [...row.querySelectorAll("input[data-plan-target]:checked")].map((input) => input.value));
+}
+
+function renderPlanCoverage(rootId, coverageId) {
+  const coverage = $(coverageId);
+  if (!coverage) return;
+  const targets = readPlanTargetEditor(rootId);
+  const message = planCoverageMessage(targets);
+  coverage.textContent = message;
+  coverage.classList.toggle("warning", message.includes("提醒"));
+}
+
+function renderPlanTargetEditor(rootId, coverageId, daysPerWeek, selectedTargets = null) {
+  const root = $(rootId);
+  if (!root) return;
+  const days = Math.min(6, Math.max(2, Number(daysPerWeek) || 4));
+  const saved = normalizeDayTargets(selectedTargets, days);
+  const targets = saved.length === days && saved.every((item) => item.length) ? saved : recommendedDayTargets(days);
+  const weekdays = preferredTrainingDays(days);
+  root.innerHTML = targets.map((selected, index) => `<article class="plan-day-target" data-plan-day="${index}">
+    <div class="plan-day-target-head"><strong>${WEEKDAY_NAMES[weekdays[index]]}</strong><span>第 ${index + 1} 练</span></div>
+    <div class="plan-target-chips">${PLAN_TARGET_EDITOR_KEYS.map((key) => `<label><input type="checkbox" data-plan-target value="${key}" ${selected.includes(key) ? "checked" : ""}><span>${PLAN_TARGETS[key].label}</span></label>`).join("")}</div>
+  </article>`).join("");
+  renderPlanCoverage(rootId, coverageId);
+}
+
+function resetPlanTargetEditor(rootId, coverageId, daysPerWeek) {
+  renderPlanTargetEditor(rootId, coverageId, daysPerWeek, recommendedDayTargets(Number(daysPerWeek) || 4));
+}
+
+function handlePlanTargetChange(event, rootId, coverageId) {
+  const input = event.target.closest("input[data-plan-target]");
+  if (!input) return;
+  const row = input.closest("[data-plan-day]");
+  if (!row) return;
+  const broad = ["full", "upper", "lower"];
+  if (input.checked && broad.includes(input.value)) {
+    row.querySelectorAll("input[data-plan-target]").forEach((item) => { if (item !== input) item.checked = false; });
+  } else if (input.checked) {
+    broad.forEach((key) => {
+      const item = row.querySelector(`input[data-plan-target][value="${key}"]`);
+      if (item) item.checked = false;
+    });
+    if (input.value === "arms") ["biceps", "triceps"].forEach((key) => { const item = row.querySelector(`input[value="${key}"]`); if (item) item.checked = false; });
+    if (["biceps", "triceps"].includes(input.value)) { const arms = row.querySelector('input[value="arms"]'); if (arms) arms.checked = false; }
+  }
+  const checked = [...row.querySelectorAll("input[data-plan-target]:checked")];
+  if (checked.length > 4) {
+    input.checked = false;
+    showToast("单个训练日最多选择 4 个重点");
+  }
+  renderPlanCoverage(rootId, coverageId);
 }
 
 function generateSmartWeeklyPlan() {
   if (!$$('#trainingEquipmentInputs input:checked').length) return showToast("至少选择一种可用器械");
   const profile = profileFromDialog();
-  if (!applySmartWeeklyPlan(profile)) return showToast("当前器械条件下没有可用动作，请先补充动作或器械");
+  if (profile.dayTargets.some((targets) => !targets.length)) return showToast("每个训练日至少选择一个训练部位");
+  if (!applySmartWeeklyPlan(profile, profile.dayTargets)) return showToast("当前器械条件下没有可用动作，请先补充动作或器械");
   saveState();
   renderTemplates();
   renderTodayPlan();
@@ -1636,15 +1805,16 @@ function onboardingProfile() {
     daysPerWeek: Number($("#onboardingDays")?.value) || 4,
     sessionMinutes: 60,
     equipment: ["barbell", "dumbbell", "machine", "bodyweight"],
+    splitStyle: "custom",
+    dayTargets: readPlanTargetEditor("#onboardingDayTargets"),
   });
 }
 
-function renderOnboardingTemplates() {
-  const root = $("#onboardingTemplateChoices");
-  if (!root) return;
-  const profile = onboardingProfile();
-  const blueprint = routineBlueprint(profile.daysPerWeek);
-  root.innerHTML = blueprint.map((item, index) => `<label class="onboarding-template-option"><input type="radio" name="onboardingTemplate" value="${index}" ${index === 0 ? "checked" : ""}><span><strong>${item.name}</strong><small>${item.muscles.slice(0, 5).join(" · ")}</small></span></label>`).join("");
+function renderOnboardingTemplates(forceRecommended = false) {
+  const profile = normalizeTrainingProfile(state.trainingProfile);
+  const days = Number($("#onboardingDays")?.value) || profile.daysPerWeek;
+  const saved = forceRecommended ? recommendedDayTargets(days) : (profile.daysPerWeek === days ? profile.dayTargets : []);
+  renderPlanTargetEditor("#onboardingDayTargets", "#onboardingCoverage", days, saved);
 }
 
 function setOnboardingStep(step) {
@@ -1652,7 +1822,7 @@ function setOnboardingStep(step) {
   $$("[data-onboarding-step]").forEach((panel) => panel.classList.toggle("active", Number(panel.dataset.onboardingStep) === target));
   if ($("#onboardingProgressText")) $("#onboardingProgressText").textContent = `${target} / 3`;
   if ($("#onboardingProgressBar")) $("#onboardingProgressBar").style.width = `${target / 3 * 100}%`;
-  if (target === 2) renderOnboardingTemplates();
+  if (target === 2 && !$("#onboardingDayTargets")?.children.length) renderOnboardingTemplates();
 }
 
 function openOnboarding(reset = false) {
@@ -1667,6 +1837,7 @@ function openOnboarding(reset = false) {
   const nutritionValue = state.settings.nutritionEnabled === false ? "no" : "yes";
   const radio = $(`input[name="onboardingNutrition"][value="${nutritionValue}"]`);
   if (radio) radio.checked = true;
+  if ($("#onboardingDayTargets")) $("#onboardingDayTargets").innerHTML = "";
   setOnboardingStep(1);
   renderOnboardingNutritionState();
   if (!$("#onboardingDialog").open) $("#onboardingDialog").showModal();
@@ -1680,7 +1851,7 @@ function renderOnboardingNutritionState() {
 
 function finishOnboarding() {
   const profile = onboardingProfile();
-  const chosen = Number($("input[name='onboardingTemplate']:checked")?.value) || 0;
+  if (profile.dayTargets.some((targets) => !targets.length)) return showToast("每个训练日至少选择一个训练部位");
   state.settings.weightUnit = $("#onboardingWeightUnit")?.value === "lb" ? "lb" : "kg";
   state.settings.nutritionEnabled = $("input[name='onboardingNutrition']:checked")?.value !== "no";
   if (state.settings.nutritionEnabled) {
@@ -1689,7 +1860,7 @@ function finishOnboarding() {
     state.settings.carbsGoal = Math.max(0, Number($("#onboardingCarbs").value) || 0);
     state.settings.fatGoal = Math.max(0, Number($("#onboardingFat").value) || 0);
   }
-  if (!applySmartWeeklyPlan(profile, chosen)) return showToast("暂时无法生成模板，请先使用默认动作");
+  if (!applySmartWeeklyPlan(profile, profile.dayTargets)) return showToast("暂时无法生成模板，请先使用默认动作");
   state.settings.onboardingCompleted = true;
   saveState();
   $("#onboardingDialog").close();
@@ -1699,10 +1870,9 @@ function finishOnboarding() {
 }
 
 function creatorMuscles(target) {
-  if (target === "upper") return ["胸", "背", "肩", "二头", "三头"];
-  if (target === "lower") return ["股四头", "后链", "臀", "小腿", "核心"];
+  if (PLAN_TARGETS[target]) return PLAN_TARGETS[target].muscles;
   if (MUSCLE_GROUPS.includes(target)) return [target];
-  return ["胸", "背", "股四头", "后链", "肩", "核心"];
+  return PLAN_TARGETS.full.muscles;
 }
 
 function rebuildCreatorPreview() {
@@ -3812,12 +3982,16 @@ function bindEvents() {
     if (label) label.textContent = toggle.checked ? "训练" : "休息";
   });
   $("#closeWeeklyPlanButton").addEventListener("click", () => $("#weeklyPlanDialog").close());
+  $("#weeklySplitBuilderButton").addEventListener("click", () => { $("#weeklyPlanDialog").close(); openSmartPlanDialog(); });
   $("#saveWeeklyPlanButton").addEventListener("click", saveWeeklyPlan);
   $("#startTodayPlanButton").addEventListener("click", startTodayPlan);
   $("#smartPlanButton").addEventListener("click", openSmartPlanDialog);
   $("#closeSmartPlanButton").addEventListener("click", () => $("#smartPlanDialog").close());
   $("#saveTrainingProfileButton").addEventListener("click", saveTrainingProfileOnly);
   $("#generateWeeklyPlanButton").addEventListener("click", generateSmartWeeklyPlan);
+  $("#trainingDaysInput").addEventListener("change", () => resetPlanTargetEditor("#smartPlanDayTargets", "#smartPlanCoverage", Number($("#trainingDaysInput").value) || 4));
+  $("#resetSmartSplitButton").addEventListener("click", () => resetPlanTargetEditor("#smartPlanDayTargets", "#smartPlanCoverage", Number($("#trainingDaysInput").value) || 4));
+  $("#smartPlanDayTargets").addEventListener("change", (event) => handlePlanTargetChange(event, "#smartPlanDayTargets", "#smartPlanCoverage"));
   $("#workoutCreatorButton").addEventListener("click", openWorkoutCreator);
   $("#recoveryWorkoutButton").addEventListener("click", startRecoveryWorkout);
   $("#adaptivePlanButton").addEventListener("click", openAdaptivePlanDialog);
@@ -4060,7 +4234,9 @@ function bindEvents() {
 
   $$("[data-onboarding-next]").forEach((button) => button.addEventListener("click", () => setOnboardingStep(button.dataset.onboardingNext)));
   $$("[data-onboarding-back]").forEach((button) => button.addEventListener("click", () => setOnboardingStep(button.dataset.onboardingBack)));
-  $("#onboardingDays").addEventListener("change", renderOnboardingTemplates);
+  $("#onboardingDays").addEventListener("change", () => renderOnboardingTemplates(true));
+  $("#resetOnboardingSplitButton").addEventListener("click", () => resetPlanTargetEditor("#onboardingDayTargets", "#onboardingCoverage", Number($("#onboardingDays").value) || 4));
+  $("#onboardingDayTargets").addEventListener("change", (event) => handlePlanTargetChange(event, "#onboardingDayTargets", "#onboardingCoverage"));
   $$("input[name='onboardingNutrition']").forEach((input) => input.addEventListener("change", renderOnboardingNutritionState));
   $("#finishOnboardingButton").addEventListener("click", finishOnboarding);
   $("#onboardingDialog").addEventListener("cancel", (event) => {
