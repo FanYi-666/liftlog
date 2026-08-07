@@ -1,5 +1,5 @@
-const CACHE_NAME = 'liftlog-v15';
-const APP_SHELL = ['./', './index.html', './styles.css?v=18', './app.js?v=18', './manifest.webmanifest'];
+const CACHE_NAME = 'liftlog-v16';
+const APP_SHELL = ['./', './index.html', './styles.css?v=19', './app.js?v=19', './manifest.webmanifest'];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(APP_SHELL)));

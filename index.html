@@ -24,7 +24,7 @@
     })();
   </script>
   <link rel="manifest" href="manifest.webmanifest" />
-  <link rel="stylesheet" href="styles.css?v=18" />
+  <link rel="stylesheet" href="styles.css?v=19" />
 </head>
 <body>
   <div class="app-shell">
@@ -42,7 +42,7 @@
     <main>
       <section class="page active" data-page="dashboard">
         <section class="today-summary" aria-label="今日概览">
-          <article class="today-summary-row food-summary-row clickable-card" data-nav-target="calories">
+          <article class="today-summary-row food-summary-row clickable-card" data-nav-target="calories" data-nutrition-surface>
             <div class="today-row-label">
               <strong>饮食</strong>
               <span id="calorieDeltaLabel">剩余 2200 kcal</span>
@@ -64,7 +64,7 @@
             <div class="today-training-values">
               <span><strong id="todaySets">0</strong><small>组</small></span>
               <span><strong id="todayReps">0</strong><small>次</small></span>
-              <span><strong id="todayVolume">0</strong><small>kg</small></span>
+              <span><strong id="todayVolume">0</strong><small id="todayVolumeUnit">kg</small></span>
             </div>
             <b class="row-chevron">›</b>
           </article>
@@ -237,7 +237,7 @@
           <div class="body-entry-card">
             <div class="body-entry-grid">
               <div class="field-group"><label for="bodyDate">日期</label><input id="bodyDate" type="date" /></div>
-              <div class="field-group"><label for="bodyWeight">体重</label><div class="macro-input-wrap"><input id="bodyWeight" type="number" min="20" max="400" step="0.1" inputmode="decimal" placeholder="70.0" /><span>kg</span></div></div>
+              <div class="field-group"><label for="bodyWeight">体重</label><div class="macro-input-wrap"><input id="bodyWeight" type="number" min="20" max="900" step="0.1" inputmode="decimal" placeholder="70.0" /><span id="bodyWeightUnit">kg</span></div></div>
               <div class="field-group"><label for="bodyFat">体脂（可选）</label><div class="macro-input-wrap"><input id="bodyFat" type="number" min="1" max="70" step="0.1" inputmode="decimal" placeholder="15.0" /><span>%</span></div></div>
             </div>
             <button class="secondary-button" id="saveBodyRecordButton" type="button">保存身体记录</button>
@@ -622,7 +622,7 @@
 
     <nav class="bottom-nav" aria-label="主导航">
       <button class="nav-item active" data-nav="dashboard"><span>⌂</span><small>概览</small></button>
-      <button class="nav-item" data-nav="calories"><span>◉</span><small>饮食</small></button>
+      <button class="nav-item" data-nav="calories" data-nutrition-surface><span>◉</span><small>饮食</small></button>
       <button class="nav-item nav-add" data-nav="log"><span>＋</span><small>训练</small></button>
       <button class="nav-item" data-nav="analytics"><span>⌁</span><small>趋势</small></button>
       <button class="nav-item" data-nav="history"><span>▤</span><small>历史</small></button>
@@ -768,7 +768,7 @@
       </div>
       <div class="calculator-fields">
         <div class="field-group">
-          <label for="warmupWorkWeight">工作重量（kg）</label>
+          <label for="warmupWorkWeight" id="warmupWeightLabel">工作重量（kg）</label>
           <input id="warmupWorkWeight" type="number" min="1" step="0.5" inputmode="decimal" />
         </div>
         <div class="field-group">
@@ -796,7 +796,7 @@
       </div>
       <div class="calculator-fields">
         <div class="field-group">
-          <label for="plateTargetWeight">目标重量（kg）</label>
+          <label for="plateTargetWeight" id="plateWeightLabel">目标重量（kg）</label>
           <input id="plateTargetWeight" type="number" min="1" step="0.5" inputmode="decimal" />
         </div>
         <div class="field-group">
@@ -809,7 +809,7 @@
         </div>
       </div>
       <div id="plateResult" class="calculator-preview plate-preview"></div>
-      <p class="helper-text">按常见 20 / 15 / 10 / 5 / 2.5 / 1.25 kg 杠铃片计算每一侧。</p>
+      <p class="helper-text" id="plateHelperText">按常见杠铃片计算每一侧。</p>
     </div>
   </dialog>
 
@@ -894,6 +894,48 @@
     </form>
   </dialog>
 
+  <dialog id="onboardingDialog" class="onboarding-dialog">
+    <div class="dialog-card onboarding-card">
+      <div class="onboarding-progress"><span id="onboardingProgressText">1 / 3</span><i><b id="onboardingProgressBar"></b></i></div>
+
+      <section class="onboarding-step active" data-onboarding-step="1">
+        <p class="eyebrow">欢迎使用 LiftLog</p>
+        <h2>先定好训练基础</h2>
+        <p class="onboarding-copy">只设置会影响今天建议的内容，之后都可以在设置里修改。</p>
+        <div class="onboarding-grid">
+          <div class="field-group"><label for="onboardingWeightUnit">重量单位</label><select id="onboardingWeightUnit"><option value="kg">kg</option><option value="lb">lb</option></select></div>
+          <div class="field-group"><label for="onboardingGoal">主要目标</label><select id="onboardingGoal"><option value="hypertrophy">增肌</option><option value="strength">力量</option><option value="fatloss">减脂 / 体能</option></select></div>
+          <div class="field-group"><label for="onboardingDays">每周训练</label><select id="onboardingDays"><option value="2">2 天</option><option value="3">3 天</option><option value="4" selected>4 天</option><option value="5">5 天</option><option value="6">6 天</option></select></div>
+        </div>
+        <button class="primary-button onboarding-next" type="button" data-onboarding-next="2">下一步</button>
+      </section>
+
+      <section class="onboarding-step" data-onboarding-step="2">
+        <p class="eyebrow">训练模板</p>
+        <h2>从哪一场开始</h2>
+        <p class="onboarding-copy">LiftLog 会按你的目标和频率生成一周模板。选择你希望第一个训练日优先安排的内容。</p>
+        <div id="onboardingTemplateChoices" class="onboarding-template-list"></div>
+        <div class="onboarding-actions"><button class="secondary-button" type="button" data-onboarding-back="1">返回</button><button class="primary-button" type="button" data-onboarding-next="3">下一步</button></div>
+      </section>
+
+      <section class="onboarding-step" data-onboarding-step="3">
+        <p class="eyebrow">饮食</p>
+        <h2>要不要一起记录饮食</h2>
+        <div class="onboarding-choice-row">
+          <label><input type="radio" name="onboardingNutrition" value="yes" checked><span><strong>记录饮食</strong><small>首页显示摄入目标和剩余热量</small></span></label>
+          <label><input type="radio" name="onboardingNutrition" value="no"><span><strong>暂不记录</strong><small>先专注训练，之后可随时开启</small></span></label>
+        </div>
+        <div id="onboardingNutritionGoals" class="onboarding-grid nutrition-goal-grid">
+          <div class="field-group"><label for="onboardingCalories">每日热量</label><input id="onboardingCalories" type="number" min="800" max="6000" step="10" value="2200"></div>
+          <div class="field-group"><label for="onboardingProtein">蛋白质（g）</label><input id="onboardingProtein" type="number" min="0" max="500" value="140"></div>
+          <div class="field-group"><label for="onboardingCarbs">碳水（g）</label><input id="onboardingCarbs" type="number" min="0" max="1000" value="250"></div>
+          <div class="field-group"><label for="onboardingFat">脂肪（g）</label><input id="onboardingFat" type="number" min="0" max="400" value="70"></div>
+        </div>
+        <div class="onboarding-actions"><button class="secondary-button" type="button" data-onboarding-back="2">返回</button><button class="primary-button" id="finishOnboardingButton" type="button">完成设置</button></div>
+      </section>
+    </div>
+  </dialog>
+
   <dialog id="settingsDialog">
     <form method="dialog" id="settingsForm" class="dialog-card">
       <div class="dialog-head">
@@ -933,6 +975,13 @@
         <label><input type="checkbox" data-ui-module="analyticsRecovery">趋势 · 恢复与训练分布</label>
         <label><input type="checkbox" data-ui-module="analyticsDetails">趋势 · PR 时间线与逐日明细</label>
       </div>
+      <div class="settings-divider"></div>
+      <div class="settings-section-title"><p class="eyebrow">BASICS</p><h3>基础偏好</h3></div>
+      <div class="settings-macro-grid">
+        <div class="field-group"><label for="weightUnitInput">重量单位</label><select id="weightUnitInput"><option value="kg">kg</option><option value="lb">lb</option></select></div>
+        <label class="settings-toggle-row"><input id="nutritionEnabledInput" type="checkbox"><span><strong>记录饮食</strong><small>关闭后首页和底部饮食入口会隐藏</small></span></label>
+      </div>
+      <button class="secondary-button settings-onboarding-button" id="restartOnboardingButton" type="button">重新打开首次设置</button>
       <div class="settings-divider"></div>
       <div class="field-group">
         <label for="calorieGoalInput">每日摄入目标（kcal）</label>
@@ -976,6 +1025,6 @@
   </div>
 
   <div id="toast" class="toast" role="status"></div>
-  <script src="app.js?v=18"></script>
+  <script src="app.js?v=19"></script>
 </body>
 </html>

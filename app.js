@@ -1,5 +1,5 @@
 const STORAGE_KEY = "liftlog-v1";
-const SCHEMA_VERSION = 13;
+const SCHEMA_VERSION = 14;
 
 const defaultState = {
   schemaVersion: SCHEMA_VERSION,
@@ -10,6 +10,9 @@ const defaultState = {
     fatGoal: 70,
     restSeconds: 120,
     theme: "system",
+    weightUnit: "kg",
+    nutritionEnabled: true,
+    onboardingCompleted: false,
     uiModules: {
       dashboardChart: false,
       dashboardRecent: false,
@@ -117,6 +120,35 @@ const EQUIPMENT_LABELS = { barbell: "杠铃", dumbbell: "哑铃", machine: "器�
 function normalizeUiModules(modules) {
   const source = modules && typeof modules === "object" ? modules : {};
   return Object.fromEntries(Object.entries(UI_MODULE_DEFAULTS).map(([key, fallback]) => [key, source[key] == null ? fallback : Boolean(source[key])]));
+}
+
+function currentWeightUnit() {
+  return state?.settings?.weightUnit === "lb" ? "lb" : "kg";
+}
+
+function weightUnitFactor() {
+  return currentWeightUnit() === "lb" ? 2.2046226218 : 1;
+}
+
+function weightToDisplay(value) {
+  return (Number(value) || 0) * weightUnitFactor();
+}
+
+function weightFromDisplay(value) {
+  return (Number(value) || 0) / weightUnitFactor();
+}
+
+function weightText(value, digits = 1) {
+  return `${formatNumber(weightToDisplay(value), digits)} ${currentWeightUnit()}`;
+}
+
+function volumeText(value, digits = 0) {
+  return `${formatNumber(weightToDisplay(value), digits)} ${currentWeightUnit()}`;
+}
+
+function weightInputValue(value, digits = 2) {
+  if (value === "" || value == null) return "";
+  return Number(weightToDisplay(value).toFixed(digits));
 }
 
 function inferRecoveryPrimary(name, primaryMuscle, saved) {
@@ -327,6 +359,9 @@ function loadState() {
     const fatGoal = Math.max(0, Number(saved.settings?.fatGoal) || defaultState.settings.fatGoal);
     const restSeconds = Math.min(600, Math.max(15, Number(saved.settings?.restSeconds) || defaultState.settings.restSeconds));
     const theme = ["system", "dark", "light"].includes(saved.settings?.theme) ? saved.settings.theme : "system";
+    const weightUnit = saved.settings?.weightUnit === "lb" ? "lb" : "kg";
+    const nutritionEnabled = saved.settings?.nutritionEnabled !== false;
+    const onboardingCompleted = saved.settings?.onboardingCompleted == null ? true : Boolean(saved.settings.onboardingCompleted);
     const uiModules = normalizeUiModules(saved.settings?.uiModules);
     const records = Array.isArray(saved.records)
       ? saved.records.map((record) => ({
@@ -351,7 +386,7 @@ function loadState() {
 
     return {
       schemaVersion: SCHEMA_VERSION,
-      settings: { calorieGoal, proteinGoal, carbsGoal, fatGoal, restSeconds, theme, uiModules },
+      settings: { calorieGoal, proteinGoal, carbsGoal, fatGoal, restSeconds, theme, weightUnit, nutritionEnabled, onboardingCompleted, uiModules },
       exercises: normalizeExercises(saved.exercises),
       records,
       foodRecords: normalizeFoodRecords(saved.foodRecords),
@@ -602,8 +637,10 @@ function lastComparableRecord(exerciseId) {
 
 function formatFocusValue(value, metricKey) {
   const metric = FOCUS_METRICS[metricKey] || FOCUS_METRICS.reps;
+  const weighted = metricKey === "avgReps" ? false : ["maxWeight", "volume"].includes(metricKey);
+  const shown = weighted ? weightToDisplay(value) : value;
   const digits = metricKey === "avgReps" || metricKey === "maxWeight" ? 1 : 0;
-  return `${formatNumber(value, digits)} ${metric.unit}`;
+  return `${formatNumber(shown, digits)} ${weighted ? currentWeightUnit() : metric.unit}`;
 }
 
 function renderFocusMetric() {
@@ -700,7 +737,7 @@ function renderExerciseSelects() {
 }
 
 function exerciseModeLabel(exercise) {
-  return exercise?.mode === "bodyweight" ? "自重 · 次数" : "负重 · kg + 次数";
+  return exercise?.mode === "bodyweight" ? "自重 · 次数" : `负重 · ${currentWeightUnit()} + 次数`;
 }
 
 function updateCurrentExerciseName() {
@@ -820,14 +857,14 @@ function renderExercisePr() {
   const { bestWeight, best1rm, bestSetReps, bestSessionReps, last } = bestStatsForExercise(exerciseId);
   $("#exercisePrimaryStatLabel").textContent = bodyweight ? "单组最多次数" : "历史最高重量";
   $("#exerciseSecondaryStatLabel").textContent = bodyweight ? "单次训练最多次数" : "预计 1RM";
-  $("#exercisePrimaryStatUnit").textContent = bodyweight ? "次" : "kg";
-  $("#exerciseSecondaryStatUnit").textContent = bodyweight ? "次" : "kg";
-  $("#exerciseBestWeight").textContent = formatNumber(bodyweight ? bestSetReps : bestWeight, bodyweight ? 0 : 1);
-  $("#exerciseBest1rm").textContent = formatNumber(bodyweight ? bestSessionReps : best1rm, bodyweight ? 0 : 1);
+  $("#exercisePrimaryStatUnit").textContent = bodyweight ? "次" : currentWeightUnit();
+  $("#exerciseSecondaryStatUnit").textContent = bodyweight ? "次" : currentWeightUnit();
+  $("#exerciseBestWeight").textContent = formatNumber(bodyweight ? bestSetReps : weightToDisplay(bestWeight), bodyweight ? 0 : 1);
+  $("#exerciseBest1rm").textContent = formatNumber(bodyweight ? bestSessionReps : weightToDisplay(best1rm), bodyweight ? 0 : 1);
   $("#exerciseLastWorkout").textContent = last
     ? bodyweight
       ? `${formatDate(last.date)} · ${sumSets(last.sets)}组 · ${sumReps(last.sets)}次`
-      : `${formatDate(last.date)} · ${sumSets(last.sets)}组 · ${formatNumber(sumVolume(last.sets))}kg`
+      : `${formatDate(last.date)} · ${sumSets(last.sets)}组 · ${volumeText(sumVolume(last.sets))}`
     : "暂无记录";
 }
 
@@ -854,7 +891,10 @@ function renderTrainingExerciseTrend() {
   const metric = ANALYTICS_METRICS[metricKey] || ANALYTICS_METRICS.reps;
   const grouped = [...groupByDate(state.records.filter((record) => record.exerciseId === exerciseId)).entries()]
     .sort(([a], [b]) => a.localeCompare(b))
-    .map(([date, records]) => ({ date, value: metricValueForRecords(records, metricKey) }))
+    .map(([date, records]) => {
+      const rawValue = metricValueForRecords(records, metricKey);
+      return { date, value: ["maxWeight", "volume"].includes(metricKey) ? weightToDisplay(rawValue) : rawValue };
+    })
     .filter((item) => item.value > 0)
     .slice(-12);
 
@@ -867,7 +907,7 @@ function renderTrainingExerciseTrend() {
   const first = grouped[0];
   const latest = grouped[grouped.length - 1];
   const delta = latest.value - first.value;
-  const unit = metric.unit;
+  const unit = ["maxWeight", "volume"].includes(metricKey) ? currentWeightUnit() : metric.unit;
   summary.textContent = `${exercise.name} · 最近 ${grouped.length} 个训练日 · 最新 ${formatNumber(latest.value, metricKey === "maxWeight" ? 1 : 0)} ${unit}${grouped.length > 1 ? ` · 较起点 ${delta >= 0 ? "+" : ""}${formatNumber(delta, metricKey === "maxWeight" ? 1 : 0)} ${unit}` : ""}`;
 
   const width = 620;
@@ -905,7 +945,7 @@ function renderWorkoutDay() {
     .sort((a, b) => String(a.createdAt || "").localeCompare(String(b.createdAt || "")));
   const totals = aggregateRecords(records);
   $("#workoutDayLabel").textContent = date === localDateISO() ? "今天" : formatDate(date, true);
-  $("#workoutDaySummary").textContent = `${totals.sets} 组 · ${totals.reps} 次${totals.volume ? ` · ${formatNumber(totals.volume)} kg` : ""}`;
+  $("#workoutDaySummary").textContent = `${totals.sets} 组 · ${totals.reps} 次${totals.volume ? ` · ${volumeText(totals.volume)}` : ""}`;
 
   const root = $("#workoutDayList");
   root.innerHTML = "";
@@ -938,7 +978,7 @@ function renderWorkoutDay() {
       const rpe = set.rpe ? ` RPE${formatNumber(set.rpe, 1)}` : "";
       return bodyweight
         ? `${type} ${formatNumber(set.reps)}次${rpe}`
-        : `${type} ${formatNumber(set.weight, 1)}kg×${formatNumber(set.reps)}${rpe}`;
+        : `${type} ${weightText(set.weight, 1)}×${formatNumber(set.reps)}${rpe}`;
     }).join(" · ");
     left.append(titleRow, detail);
     if (record.note) {
@@ -950,7 +990,7 @@ function renderWorkoutDay() {
     const actions = document.createElement("div");
     actions.className = "record-actions";
     const feedbackLabel = record.feedback === "easy" ? "太轻" : record.feedback === "hard" ? "太难" : record.feedback === "good" ? "合适" : "感受";
-    actions.innerHTML = `<span class="record-volume">${bodyweight ? `${sumReps(record.sets)} 次` : `${formatNumber(sumVolume(record.sets))} kg`}</span><button type="button" data-workout-feedback-edit="${record.id}">${feedbackLabel}</button><button type="button" data-workout-edit="${record.id}">编辑</button><button type="button" class="danger-action" data-workout-delete="${record.id}">删除</button>`;
+    actions.innerHTML = `<span class="record-volume">${bodyweight ? `${sumReps(record.sets)} 次` : volumeText(sumVolume(record.sets))}</span><button type="button" data-workout-feedback-edit="${record.id}">${feedbackLabel}</button><button type="button" data-workout-edit="${record.id}">编辑</button><button type="button" class="danger-action" data-workout-delete="${record.id}">删除</button>`;
     card.append(left, actions);
     root.appendChild(card);
   });
@@ -963,7 +1003,7 @@ function renderSetRows() {
   root.innerHTML = "";
   root.classList.toggle("bodyweight-mode", bodyweight);
   $("#setTableHead")?.classList.toggle("bodyweight-mode", bodyweight);
-  if ($("#weightColumnLabel")) $("#weightColumnLabel").textContent = bodyweight ? "自重" : "kg";
+  if ($("#weightColumnLabel")) $("#weightColumnLabel").textContent = bodyweight ? "自重" : currentWeightUnit();
   draftSets.forEach((set, index) => {
     const row = document.createElement("div");
     row.className = `set-row ${set.completed ? "completed" : ""}`;
@@ -984,10 +1024,10 @@ function renderSetRows() {
       weight = document.createElement("input");
       weight.type = "number";
       weight.min = "0";
-      weight.step = "0.5";
+      weight.step = currentWeightUnit() === "lb" ? "1" : "0.5";
       weight.inputMode = "decimal";
-      weight.placeholder = "kg";
-      weight.value = set.weight;
+      weight.placeholder = currentWeightUnit();
+      weight.value = weightInputValue(set.weight);
       weight.dataset.field = "weight";
       weight.dataset.index = index;
     }
@@ -1256,7 +1296,7 @@ function renderTemplateEditor() {
       row.className = `template-set-edit-row ${bodyweight ? "bodyweight" : ""}`;
       const typeOptions = Object.entries(SET_TYPES).map(([key, meta]) => `<option value="${key}" ${key === (set.type || "normal") ? "selected" : ""}>${meta.short}</option>`).join("");
       row.innerHTML = `<select data-template-set-field="type" data-exercise-index="${exerciseIndex}" data-set-index="${setIndex}">${typeOptions}</select>
-        ${bodyweight ? '<span class="template-bodyweight-label">自重</span>' : `<input type="number" step="0.5" min="0" inputmode="decimal" value="${Number(set.weight) || 0}" data-template-set-field="weight" data-exercise-index="${exerciseIndex}" data-set-index="${setIndex}" aria-label="重量">`}
+        ${bodyweight ? '<span class="template-bodyweight-label">自重</span>' : `<input type="number" step="${currentWeightUnit() === "lb" ? "1" : "0.5"}" min="0" inputmode="decimal" value="${weightInputValue(set.weight)}" data-template-set-field="weight" data-exercise-index="${exerciseIndex}" data-set-index="${setIndex}" aria-label="重量（${currentWeightUnit()}）">`}
         <input type="number" step="1" min="0" inputmode="numeric" value="${Number(set.reps) || 0}" data-template-set-field="reps" data-exercise-index="${exerciseIndex}" data-set-index="${setIndex}" aria-label="次数">
         <input type="number" step="0.5" min="6" max="10" inputmode="decimal" value="${set.rpe ?? ""}" placeholder="RPE" data-template-set-field="rpe" data-exercise-index="${exerciseIndex}" data-set-index="${setIndex}" aria-label="RPE">
         <button type="button" class="danger-action" data-template-set-remove="${exerciseIndex}:${setIndex}">×</button>`;
@@ -1344,11 +1384,21 @@ function renderTodayPlan() {
   const todayRecords = state.records.filter((record) => record.date === localDateISO());
   card.classList.remove("due", "done");
   if (!entry?.isTrainingDay) {
-    $("#todayPlanName").textContent = "今天是休息日";
-    $("#todayPlanMeta").textContent = "周计划里可以随时把今天改成训练日。";
+    const basePlan = normalizeWeeklyPlan(state.weeklyPlan);
+    let nextText = "周计划里可以随时把今天改成训练日。";
+    for (let offset = 1; offset <= 7; offset += 1) {
+      const date = addDays(new Date(), offset);
+      const next = basePlan[currentWeekdayIndex(date)];
+      if (!next?.isTrainingDay) continue;
+      const nextTemplate = state.templates.find((item) => item.id === next.templateId);
+      nextText = `下一次：${WEEKDAY_NAMES[currentWeekdayIndex(date)]} · ${nextTemplate?.name || "自由训练"}`;
+      break;
+    }
+    $("#todayPlanName").textContent = "今天休息";
+    $("#todayPlanMeta").textContent = nextText;
     $("#startTodayPlanButton").classList.add("hidden");
-    if ($("#dashboardPlanName")) $("#dashboardPlanName").textContent = "今天是休息日";
-    if ($("#dashboardPlanMeta")) $("#dashboardPlanMeta").textContent = "恢复也是训练计划的一部分";
+    if ($("#dashboardPlanName")) $("#dashboardPlanName").textContent = "今天休息";
+    if ($("#dashboardPlanMeta")) $("#dashboardPlanMeta").textContent = nextText;
     $("#dashboardPlanStrip")?.classList.remove("due", "done");
     return;
   }
@@ -1546,12 +1596,12 @@ function preferredTrainingDays(count) {
   return result.sort((a, b) => a - b);
 }
 
-function generateSmartWeeklyPlan() {
-  if (!$$('#trainingEquipmentInputs input:checked').length) return showToast("至少选择一种可用器械");
-  const profile = profileFromDialog();
-  const blueprint = routineBlueprint(profile.daysPerWeek);
+function applySmartWeeklyPlan(profile, preferredStartIndex = 0) {
+  const baseBlueprint = routineBlueprint(profile.daysPerWeek);
+  const start = Math.min(Math.max(0, Number(preferredStartIndex) || 0), Math.max(0, baseBlueprint.length - 1));
+  const blueprint = [...baseBlueprint.slice(start), ...baseBlueprint.slice(0, start)];
   const templates = blueprint.map((item) => generatedTemplateFromMuscles(`${item.name} · ${TRAINING_GOAL_LABELS[profile.goal]}`, item.muscles, profile));
-  if (!templates.some((template) => template.exercises.length)) return showToast("当前器械条件下没有可用动作，请先补充动作或器械");
+  if (!templates.some((template) => template.exercises.length)) return false;
   const oldPlan = normalizeWeeklyPlan(state.weeklyPlan);
   const days = preferredTrainingDays(profile.daysPerWeek);
   state.templates = state.templates.filter((template) => template.generatedBy !== "smart-plan").concat(templates);
@@ -1563,6 +1613,13 @@ function generateSmartWeeklyPlan() {
   });
   state.trainingProfile = profile;
   state.planOverrides = [];
+  return true;
+}
+
+function generateSmartWeeklyPlan() {
+  if (!$$('#trainingEquipmentInputs input:checked').length) return showToast("至少选择一种可用器械");
+  const profile = profileFromDialog();
+  if (!applySmartWeeklyPlan(profile)) return showToast("当前器械条件下没有可用动作，请先补充动作或器械");
   saveState();
   renderTemplates();
   renderTodayPlan();
@@ -1570,6 +1627,75 @@ function generateSmartWeeklyPlan() {
   renderRecoveryAdvisor();
   $("#smartPlanDialog").close();
   showToast(`已生成 ${profile.daysPerWeek} 天训练计划，可在周计划里改日期和时间`);
+}
+
+function onboardingProfile() {
+  return normalizeTrainingProfile({
+    goal: $("#onboardingGoal")?.value || "hypertrophy",
+    level: "intermediate",
+    daysPerWeek: Number($("#onboardingDays")?.value) || 4,
+    sessionMinutes: 60,
+    equipment: ["barbell", "dumbbell", "machine", "bodyweight"],
+  });
+}
+
+function renderOnboardingTemplates() {
+  const root = $("#onboardingTemplateChoices");
+  if (!root) return;
+  const profile = onboardingProfile();
+  const blueprint = routineBlueprint(profile.daysPerWeek);
+  root.innerHTML = blueprint.map((item, index) => `<label class="onboarding-template-option"><input type="radio" name="onboardingTemplate" value="${index}" ${index === 0 ? "checked" : ""}><span><strong>${item.name}</strong><small>${item.muscles.slice(0, 5).join(" · ")}</small></span></label>`).join("");
+}
+
+function setOnboardingStep(step) {
+  const target = Math.min(3, Math.max(1, Number(step) || 1));
+  $$("[data-onboarding-step]").forEach((panel) => panel.classList.toggle("active", Number(panel.dataset.onboardingStep) === target));
+  if ($("#onboardingProgressText")) $("#onboardingProgressText").textContent = `${target} / 3`;
+  if ($("#onboardingProgressBar")) $("#onboardingProgressBar").style.width = `${target / 3 * 100}%`;
+  if (target === 2) renderOnboardingTemplates();
+}
+
+function openOnboarding(reset = false) {
+  const profile = normalizeTrainingProfile(state.trainingProfile);
+  $("#onboardingWeightUnit").value = currentWeightUnit();
+  $("#onboardingGoal").value = profile.goal;
+  $("#onboardingDays").value = String(profile.daysPerWeek);
+  $("#onboardingCalories").value = state.settings.calorieGoal;
+  $("#onboardingProtein").value = state.settings.proteinGoal;
+  $("#onboardingCarbs").value = state.settings.carbsGoal;
+  $("#onboardingFat").value = state.settings.fatGoal;
+  const nutritionValue = state.settings.nutritionEnabled === false ? "no" : "yes";
+  const radio = $(`input[name="onboardingNutrition"][value="${nutritionValue}"]`);
+  if (radio) radio.checked = true;
+  setOnboardingStep(1);
+  renderOnboardingNutritionState();
+  if (!$("#onboardingDialog").open) $("#onboardingDialog").showModal();
+}
+
+function renderOnboardingNutritionState() {
+  const enabled = $("input[name='onboardingNutrition']:checked")?.value !== "no";
+  $("#onboardingNutritionGoals")?.classList.toggle("disabled-section", !enabled);
+  $$("#onboardingNutritionGoals input").forEach((input) => { input.disabled = !enabled; });
+}
+
+function finishOnboarding() {
+  const profile = onboardingProfile();
+  const chosen = Number($("input[name='onboardingTemplate']:checked")?.value) || 0;
+  state.settings.weightUnit = $("#onboardingWeightUnit")?.value === "lb" ? "lb" : "kg";
+  state.settings.nutritionEnabled = $("input[name='onboardingNutrition']:checked")?.value !== "no";
+  if (state.settings.nutritionEnabled) {
+    state.settings.calorieGoal = Math.max(800, Number($("#onboardingCalories").value) || 2200);
+    state.settings.proteinGoal = Math.max(0, Number($("#onboardingProtein").value) || 0);
+    state.settings.carbsGoal = Math.max(0, Number($("#onboardingCarbs").value) || 0);
+    state.settings.fatGoal = Math.max(0, Number($("#onboardingFat").value) || 0);
+  }
+  if (!applySmartWeeklyPlan(profile, chosen)) return showToast("暂时无法生成模板，请先使用默认动作");
+  state.settings.onboardingCompleted = true;
+  saveState();
+  $("#onboardingDialog").close();
+  renderAll();
+  navigate("dashboard");
+  showToast("设置完成，今天的建议已经准备好");
 }
 
 function creatorMuscles(target) {
@@ -1643,13 +1769,14 @@ function renderProgressionSuggestion() {
   }
   const workingWeight = representativeWorkingWeight(sets);
   if (feedback === "hard" || avgRpe >= 9.5) {
-    $("#progressionSuggestionTitle").textContent = `保持 ${formatNumber(workingWeight, 1)} kg，先少 1 次/组`;
+    $("#progressionSuggestionTitle").textContent = `保持 ${weightText(workingWeight, 1)}，先少 1 次/组`;
     $("#progressionSuggestionBody").textContent = `上次 RPE ${formatNumber(avgRpe, 1)} 偏高，优先把动作质量和完成度稳定下来。`;
   } else if (feedback === "easy" || avgRpe <= 7.5) {
-    $("#progressionSuggestionTitle").textContent = `尝试 ${formatNumber(workingWeight + 2.5, 1)} kg`;
-    $("#progressionSuggestionBody").textContent = `上次代表性重量 ${formatNumber(workingWeight, 1)} kg · 平均 ${formatNumber(avgReps, 1)} 次 · RPE ${formatNumber(avgRpe, 1)}，可以小幅加重。`;
+    const increment = currentWeightUnit() === "lb" ? 5 / 2.2046226218 : 2.5;
+    $("#progressionSuggestionTitle").textContent = `尝试 ${weightText(workingWeight + increment, 1)}`;
+    $("#progressionSuggestionBody").textContent = `上次代表性重量 ${weightText(workingWeight, 1)} · 平均 ${formatNumber(avgReps, 1)} 次 · RPE ${formatNumber(avgRpe, 1)}，可以小幅加重。`;
   } else {
-    $("#progressionSuggestionTitle").textContent = `保持 ${formatNumber(workingWeight, 1)} kg，每组 +1 次`;
+    $("#progressionSuggestionTitle").textContent = `保持 ${weightText(workingWeight, 1)}，每组 +1 次`;
     $("#progressionSuggestionBody").textContent = `先用相同重量增加总次数；当 RPE 仍稳定在 8 左右，再增加重量。`;
   }
 }
@@ -2162,15 +2289,16 @@ function warmupPlan(workWeight, count) {
     3: [[0.4, 8], [0.6, 5], [0.8, 2]],
     4: [[0.4, 8], [0.55, 5], [0.7, 3], [0.85, 1]],
   };
+  const incrementKg = currentWeightUnit() === "lb" ? 5 / 2.2046226218 : 2.5;
   return (presets[count] || presets[3]).map(([ratio, reps]) => ({
-    weight: Math.max(2.5, Math.round((workWeight * ratio) / 2.5) * 2.5),
+    weight: Math.max(incrementKg, Math.round((workWeight * ratio) / incrementKg) * incrementKg),
     reps,
     ratio,
   }));
 }
 
 function renderWarmupPreview() {
-  const workWeight = Number($("#warmupWorkWeight")?.value) || 0;
+  const workWeight = weightFromDisplay($("#warmupWorkWeight")?.value);
   const count = Number($("#warmupSetCount")?.value) || 3;
   const root = $("#warmupPreview");
   if (!root) return;
@@ -2179,18 +2307,18 @@ function renderWarmupPreview() {
     return;
   }
   const plan = warmupPlan(workWeight, count);
-  root.innerHTML = plan.map((set, index) => `<div class="calculator-line"><span>W${index + 1} · ${Math.round(set.ratio * 100)}%</span><strong>${formatNumber(set.weight, 1)} kg × ${set.reps}</strong></div>`).join("");
+  root.innerHTML = plan.map((set, index) => `<div class="calculator-line"><span>W${index + 1} · ${Math.round(set.ratio * 100)}%</span><strong>${weightText(set.weight, 1)} × ${set.reps}</strong></div>`).join("");
 }
 
 function openWarmupCalculator() {
   if (isBodyweightExercise($("#exerciseSelect").value)) return;
-  $("#warmupWorkWeight").value = formatNumber(currentWorkWeight(), 1).replace(/,/g, "");
+  $("#warmupWorkWeight").value = weightInputValue(currentWorkWeight(), 1);
   renderWarmupPreview();
   $("#warmupDialog").showModal();
 }
 
 function applyWarmupPlan() {
-  const workWeight = Number($("#warmupWorkWeight").value);
+  const workWeight = weightFromDisplay($("#warmupWorkWeight").value);
   const count = Number($("#warmupSetCount").value) || 3;
   if (!workWeight || workWeight <= 0) return showToast("请输入有效工作重量");
   const warmups = warmupPlan(workWeight, count).map((set) => newDraftSet({
@@ -2208,7 +2336,7 @@ function applyWarmupPlan() {
 
 function platePlan(target, barWeight) {
   const perSide = Math.max(0, (target - barWeight) / 2);
-  const plates = [20, 15, 10, 5, 2.5, 1.25];
+  const plates = currentWeightUnit() === "lb" ? [45, 35, 25, 10, 5, 2.5] : [20, 15, 10, 5, 2.5, 1.25];
   let remaining = perSide;
   const result = [];
   plates.forEach((plate) => {
@@ -2227,7 +2355,7 @@ function renderPlateResult() {
   const root = $("#plateResult");
   if (!root) return;
   if (target < barWeight) {
-    root.innerHTML = `<div class="empty-state calculator-empty">目标重量不能低于 ${barWeight} kg 杠铃杆。</div>`;
+    root.innerHTML = `<div class="empty-state calculator-empty">目标重量不能低于 ${formatNumber(barWeight, 1)} ${currentWeightUnit()} 杠铃杆。</div>`;
     return;
   }
   const plan = platePlan(target, barWeight);
@@ -2235,15 +2363,19 @@ function renderPlateResult() {
     ? plan.result.map((item) => `${formatNumber(item.plate, 2)}×${item.count}`).join(" + ")
     : "无需加片";
   root.innerHTML = `<div class="plate-total"><span>每侧需要</span><strong>${plateText}</strong></div>
-    <div class="calculator-line"><span>每侧片重</span><strong>${formatNumber(plan.perSide - plan.remaining, 2)} kg</strong></div>
-    ${plan.remaining > 0.001 ? `<div class="calculator-warning">现有常见片无法精确达到，还差每侧 ${formatNumber(plan.remaining, 2)} kg。</div>` : '<div class="calculator-success">可以精确配到目标重量。</div>'}`;
+    <div class="calculator-line"><span>每侧片重</span><strong>${formatNumber(plan.perSide - plan.remaining, 2)} ${currentWeightUnit()}</strong></div>
+    ${plan.remaining > 0.001 ? `<div class="calculator-warning">现有常见片无法精确达到，还差每侧 ${formatNumber(plan.remaining, 2)} ${currentWeightUnit()}。</div>` : '<div class="calculator-success">可以精确配到目标重量。</div>'}`;
 }
 
 function openPlateCalculator() {
   if (isBodyweightExercise($("#exerciseSelect").value)) return;
   const exercise = exerciseById($("#exerciseSelect").value);
-  $("#plateTargetWeight").value = formatNumber(currentWorkWeight(), 1).replace(/,/g, "");
-  $("#barWeightSelect").value = String(exercise?.barWeight || 20);
+  $("#plateTargetWeight").value = weightInputValue(currentWorkWeight(), 1);
+  const barOptions = currentWeightUnit() === "lb" ? [45, 35, 25] : [20, 15, 10];
+  $("#barWeightSelect").innerHTML = barOptions.map((value) => `<option value="${value}">${value} ${currentWeightUnit()}</option>`).join("");
+  const savedDisplay = weightToDisplay(exercise?.barWeight || 20);
+  const closest = barOptions.reduce((best, value) => Math.abs(value - savedDisplay) < Math.abs(best - savedDisplay) ? value : best, barOptions[0]);
+  $("#barWeightSelect").value = String(closest);
   renderPlateResult();
   $("#plateDialog").showModal();
 }
@@ -2268,7 +2400,7 @@ function renderDashboard() {
 
   $("#todaySets").textContent = formatNumber(todayStats.sets);
   $("#todayReps").textContent = formatNumber(todayStats.reps);
-  $("#todayVolume").textContent = formatNumber(todayStats.volume);
+  $("#todayVolume").textContent = formatNumber(weightToDisplay(todayStats.volume));
   if ($("#todayTrainingState")) $("#todayTrainingState").textContent = todayRecords.length ? `已记录 ${todayRecords.length} 个动作` : "尚未训练";
 
   const weekday = new Intl.DateTimeFormat("zh-CN", { month: "long", day: "numeric", weekday: "long" }).format(new Date());
@@ -2295,7 +2427,7 @@ function renderWeeklyChart() {
     const bar = document.createElement("div");
     bar.className = "bar";
     bar.style.height = `${Math.max(volume ? 8 : 3, (volume / max) * 110)}px`;
-    bar.title = `${formatDate(date)}：${formatNumber(volume)} kg`;
+    bar.title = `${formatDate(date)}：${volumeText(volume)}`;
     const label = document.createElement("span");
     label.className = "bar-label";
     label.textContent = new Intl.DateTimeFormat("zh-CN", { weekday: "short" }).format(dateFromISO(date)).replace("周", "");
@@ -2331,7 +2463,7 @@ function renderRecentExercises() {
     const bodyweight = exercise?.mode === "bodyweight";
     meta.innerHTML = bodyweight
       ? `${sumSets(record.sets)} 组 · ${sumReps(record.sets)} 次<br>自重训练`
-      : `${sumSets(record.sets)} 组 · ${sumReps(record.sets)} 次<br>${formatNumber(sumVolume(record.sets))} kg`;
+      : `${sumSets(record.sets)} 组 · ${sumReps(record.sets)} 次<br>${volumeText(sumVolume(record.sets))}`;
     card.dataset.recentEdit = record.id;
     card.classList.add("clickable-card");
     card.append(left, meta);
@@ -2511,7 +2643,7 @@ function renderNutritionTrend() {
 
 function saveBodyRecord() {
   const date = $("#bodyDate").value || localDateISO();
-  const weight = Number($("#bodyWeight").value) > 0 ? Number($("#bodyWeight").value) : null;
+  const weight = Number($("#bodyWeight").value) > 0 ? weightFromDisplay($("#bodyWeight").value) : null;
   const bodyFat = Number($("#bodyFat").value) > 0 ? Number($("#bodyFat").value) : null;
   if (!weight && !bodyFat) return showToast("至少填写体重或体脂一项");
   const existing = state.bodyRecords.find((record) => record.date === date);
@@ -2539,9 +2671,9 @@ function renderBodyTracking() {
   const recent7 = state.bodyRecords.filter((record) => record.date >= daysAgoISO(6) && Number(record.weight) > 0);
   const avg7 = recent7.length ? recent7.reduce((sum, record) => sum + Number(record.weight), 0) / recent7.length : null;
   summary.innerHTML = `
-    <article><span>最新体重</span><strong>${latestWeight ? formatNumber(latestWeight.weight, 1) : "—"}</strong><small>${latestWeight ? "kg" : "暂无"}</small></article>
-    <article><span>7天平均</span><strong>${avg7 != null ? formatNumber(avg7, 1) : "—"}</strong><small>${avg7 != null ? "kg" : "暂无"}</small></article>
-    <article><span>30天变化</span><strong>${weightDelta == null ? "—" : `${weightDelta > 0 ? "+" : ""}${formatNumber(weightDelta, 1)}`}</strong><small>${weightDelta == null ? "暂无" : "kg"}</small></article>
+    <article><span>最新体重</span><strong>${latestWeight ? formatNumber(weightToDisplay(latestWeight.weight), 1) : "—"}</strong><small>${latestWeight ? currentWeightUnit() : "暂无"}</small></article>
+    <article><span>7天平均</span><strong>${avg7 != null ? formatNumber(weightToDisplay(avg7), 1) : "—"}</strong><small>${avg7 != null ? currentWeightUnit() : "暂无"}</small></article>
+    <article><span>30天变化</span><strong>${weightDelta == null ? "—" : `${weightDelta > 0 ? "+" : ""}${formatNumber(weightToDisplay(weightDelta), 1)}`}</strong><small>${weightDelta == null ? "暂无" : currentWeightUnit()}</small></article>
     <article><span>最新体脂</span><strong>${latestFat ? formatNumber(latestFat.bodyFat, 1) : "—"}</strong><small>${latestFat ? "%" : "暂无"}</small></article>`;
 
   const days = 30;
@@ -2572,7 +2704,7 @@ function renderBodyTracking() {
     </svg><div class="nutrition-chart-legend"><span><i class="body-weight-legend"></i>体重</span><span><i class="calorie-legend"></i>热量</span></div>`;
   }
   list.innerHTML = sorted.length
-    ? sorted.slice(0, 12).map((record) => `<article class="body-record-row"><div><strong>${formatDate(record.date, true)}</strong><small>${record.weight ? `${formatNumber(record.weight, 1)} kg` : "未记体重"}${record.bodyFat ? ` · 体脂 ${formatNumber(record.bodyFat, 1)}%` : ""}</small></div><div><button type="button" data-body-edit="${record.date}">编辑</button><button type="button" class="danger-action" data-body-delete="${record.date}">删除</button></div></article>`).join("")
+    ? sorted.slice(0, 12).map((record) => `<article class="body-record-row"><div><strong>${formatDate(record.date, true)}</strong><small>${record.weight ? weightText(record.weight, 1) : "未记体重"}${record.bodyFat ? ` · 体脂 ${formatNumber(record.bodyFat, 1)}%` : ""}</small></div><div><button type="button" data-body-edit="${record.date}">编辑</button><button type="button" class="danger-action" data-body-delete="${record.date}">删除</button></div></article>`).join("")
     : '<div class="empty-state">还没有身体记录。</div>';
 }
 
@@ -2749,7 +2881,7 @@ function renderComparisonBody(root, current, previous) {
     ["训练天", current.days, previous.days, "天"],
     ["正式组", current.sets, previous.sets, "组"],
     ["总次数", current.reps, previous.reps, "次"],
-    ["负重容量", current.volume, previous.volume, "kg"],
+    ["负重容量", weightToDisplay(current.volume), weightToDisplay(previous.volume), currentWeightUnit()],
   ];
   root.innerHTML = items.map(([label, now, before, unit]) => {
     const change = percentageChange(now, before);
@@ -2875,11 +3007,11 @@ function prTimelineForExercise(exerciseId) {
       const weight = Number(set.weight) || 0;
       if (weight > bestWeight) {
         bestWeight = weight;
-        events.push({ date: record.date, label: "最高重量 PR", value: `${formatNumber(weight, 1)} kg` });
+        events.push({ date: record.date, label: "最高重量 PR", value: weightText(weight, 1) });
       }
       if (REP_PR_TARGETS.includes(reps) && weight > repBests[reps]) {
         repBests[reps] = weight;
-        events.push({ date: record.date, label: `${reps}RM PR`, value: `${formatNumber(weight, 1)} kg` });
+        events.push({ date: record.date, label: `${reps}RM PR`, value: weightText(weight, 1) });
       }
     }));
   }
@@ -2910,7 +3042,7 @@ function renderRepPrs(exerciseId) {
     const prs = repPrsForExercise(exerciseId);
     root.innerHTML = REP_PR_TARGETS.map((reps) => {
       const pr = prs[reps];
-      return `<article><span>${reps}RM</span><strong>${pr ? formatNumber(pr.weight, 1) : "—"}</strong><small>${pr ? "kg" : "暂无"}</small>${pr ? `<em>${formatDate(pr.date)}</em>` : ""}</article>`;
+      return `<article><span>${reps}RM</span><strong>${pr ? formatNumber(weightToDisplay(pr.weight), 1) : "—"}</strong><small>${pr ? currentWeightUnit() : "暂无"}</small>${pr ? `<em>${formatDate(pr.date)}</em>` : ""}</article>`;
     }).join("");
   }
   const events = prTimelineForExercise(exerciseId);
@@ -2964,8 +3096,8 @@ function renderAnalytics() {
   } else {
     $("#rangeThirdLabel").textContent = "总容量";
     $("#rangeFourthLabel").textContent = "阶段最高重量";
-    $("#rangeVolume").textContent = `${formatNumber(stats.volume)} kg`;
-    $("#rangeMaxWeight").textContent = `${formatNumber(maxWeightForRecords(records), 1)} kg`;
+    $("#rangeVolume").textContent = volumeText(stats.volume);
+    $("#rangeMaxWeight").textContent = weightText(maxWeightForRecords(records), 1);
   }
   $("#chartExerciseTitle").textContent = exercise?.name || "动作";
   $("#chartMetricLabel").textContent = `每天该动作${metric.label}`;
@@ -2983,7 +3115,8 @@ function renderTrendChart(records, days, metricKey) {
   const data = [];
   for (let i = days - 1; i >= 0; i -= 1) {
     const date = daysAgoISO(i);
-    data.push({ date, value: metricValueForRecords(grouped.get(date) || [], metricKey) });
+    const rawValue = metricValueForRecords(grouped.get(date) || [], metricKey);
+    data.push({ date, value: ["maxWeight", "volume"].includes(metricKey) ? weightToDisplay(rawValue) : rawValue });
   }
 
   const width = 620;
@@ -3015,7 +3148,8 @@ function renderTrendChart(records, days, metricKey) {
   const dots = data.map((d, i) => {
     if (!d.value || (i % dotEvery !== 0 && i !== data.length - 1)) return "";
     const formatted = formatNumber(d.value, metricKey === "maxWeight" ? 1 : 0);
-    return `<circle class="chart-dot" cx="${x(i)}" cy="${y(d.value)}" r="3.5"><title>${formatDate(d.date)}：${formatted} ${metric.unit}</title></circle>`;
+    const unit = ["maxWeight", "volume"].includes(metricKey) ? currentWeightUnit() : metric.unit;
+    return `<circle class="chart-dot" cx="${x(i)}" cy="${y(d.value)}" r="3.5"><title>${formatDate(d.date)}：${formatted} ${unit}</title></circle>`;
   }).join("");
 
   root.innerHTML = `<svg viewBox="0 0 ${width} ${height}" role="img" aria-label="每日${metric.label}折线图">
@@ -3051,7 +3185,7 @@ function renderExerciseHistory(records) {
     const dayBestReps = bestSetRepsForRecords(dayRecords);
     head.innerHTML = bodyweight
       ? `<div><strong>${formatDate(date, true)}</strong><div class="date">${stats.sets} 组 · 单组最多 ${dayBestReps} 次</div></div><div class="total">${stats.reps} 次</div>`
-      : `<div><strong>${formatDate(date, true)}</strong><div class="date">${stats.sets} 组 · 最高 ${formatNumber(dayMaxWeight, 1)} kg</div></div><div class="total">${formatNumber(stats.volume)} kg</div>`;
+      : `<div><strong>${formatDate(date, true)}</strong><div class="date">${stats.sets} 组 · 最高 ${weightText(dayMaxWeight, 1)}</div></div><div class="total">${volumeText(stats.volume)}</div>`;
 
     const chips = document.createElement("div");
     chips.className = "set-chips";
@@ -3062,7 +3196,7 @@ function renderExerciseHistory(records) {
       const rpe = set.rpe ? ` · RPE ${formatNumber(set.rpe, 1)} (${rirFromRpe(set.rpe)})` : "";
       chip.textContent = bodyweight
         ? `${index + 1}. ${type} · ${formatNumber(set.reps)}次${rpe}`
-        : `${index + 1}. ${type} · ${formatNumber(set.weight, 1)}kg × ${formatNumber(set.reps)}${rpe}`;
+        : `${index + 1}. ${type} · ${weightText(set.weight, 1)} × ${formatNumber(set.reps)}${rpe}`;
       chips.appendChild(chip);
     });
 
@@ -3070,7 +3204,7 @@ function renderExerciseHistory(records) {
     totals.className = "history-totals";
     totals.innerHTML = bodyweight
       ? `<span>合计 ${stats.sets} 组</span><span>${stats.reps} 次</span><span>单组最多 ${dayBestReps} 次</span>`
-      : `<span>合计 ${stats.sets} 组</span><span>${stats.reps} 次</span><span>${formatNumber(stats.volume)} kg</span><span>最高 ${formatNumber(dayMaxWeight, 1)} kg</span>`;
+      : `<span>合计 ${stats.sets} 组</span><span>${stats.reps} 次</span><span>${volumeText(stats.volume)}</span><span>最高 ${weightText(dayMaxWeight, 1)}</span>`;
     card.append(head, chips, totals);
     root.appendChild(card);
   });
@@ -3106,7 +3240,7 @@ function renderHistoryPage() {
       const bodyweight = exercise?.mode === "bodyweight";
       const meta = bodyweight
         ? `${sumSets(record.sets)} 组 · ${sumReps(record.sets)} 次 · 自重`
-        : `${sumSets(record.sets)} 组 · ${sumReps(record.sets)} 次 · ${formatNumber(sumVolume(record.sets))} kg`;
+        : `${sumSets(record.sets)} 组 · ${sumReps(record.sets)} 次 · ${volumeText(sumVolume(record.sets))}`;
       row.innerHTML = `<div><strong></strong><p class="muted">${meta}${record.note ? " · 有备注" : ""}</p></div><div class="history-record-actions"><button type="button" data-history-edit="${record.id}">编辑</button><button type="button" class="danger-action" data-history-delete="${record.id}">删除</button></div>`;
       row.querySelector("strong").textContent = exercise?.name || "已删除动作";
       outer.appendChild(row);
@@ -3114,14 +3248,31 @@ function renderHistoryPage() {
 
     const totals = document.createElement("div");
     totals.className = "history-totals";
-    totals.innerHTML = `<span>全天 ${dayStats.sets} 组</span><span>${dayStats.reps} 次</span>${dayStats.volume ? `<span>负重容量 ${formatNumber(dayStats.volume)} kg</span>` : ""}`;
+    totals.innerHTML = `<span>全天 ${dayStats.sets} 组</span><span>${dayStats.reps} 次</span>${dayStats.volume ? `<span>负重容量 ${volumeText(dayStats.volume)}</span>` : ""}`;
     outer.appendChild(totals);
     root.appendChild(outer);
   });
 }
 
+function renderUserPreferences() {
+  const nutritionEnabled = state.settings.nutritionEnabled !== false;
+  $$('[data-nutrition-surface]').forEach((node) => node.classList.toggle('module-hidden', !nutritionEnabled));
+  const unit = currentWeightUnit();
+  if ($("#todayVolumeUnit")) $("#todayVolumeUnit").textContent = unit;
+  if ($("#bodyWeightUnit")) $("#bodyWeightUnit").textContent = unit;
+  if ($("#warmupWeightLabel")) $("#warmupWeightLabel").textContent = `工作重量（${unit}）`;
+  if ($("#plateWeightLabel")) $("#plateWeightLabel").textContent = `目标重量（${unit}）`;
+  if ($("#plateHelperText")) $("#plateHelperText").textContent = unit === "lb"
+    ? "按常见 45 / 35 / 25 / 10 / 5 / 2.5 lb 杠铃片计算每一侧。"
+    : "按常见 20 / 15 / 10 / 5 / 2.5 / 1.25 kg 杠铃片计算每一侧。";
+  if ($("#bodyWeight")) $("#bodyWeight").placeholder = unit === "lb" ? "154.0" : "70.0";
+  if ($("#warmupWorkWeight")) $("#warmupWorkWeight").step = unit === "lb" ? "1" : "0.5";
+  if ($("#plateTargetWeight")) $("#plateTargetWeight").step = unit === "lb" ? "1" : "0.5";
+}
+
 function renderAll() {
   applyTheme();
+  renderUserPreferences();
   renderUiModules();
   renderExerciseSelects();
   renderSetRows();
@@ -3404,6 +3555,9 @@ async function importData(file) {
         fatGoal: Math.max(0, Number(data.settings?.fatGoal) || 70),
         restSeconds: Math.min(600, Math.max(15, Number(data.settings?.restSeconds) || 120)),
         theme: ["system", "dark", "light"].includes(data.settings?.theme) ? data.settings.theme : "system",
+        weightUnit: data.settings?.weightUnit === "lb" ? "lb" : "kg",
+        nutritionEnabled: data.settings?.nutritionEnabled !== false,
+        onboardingCompleted: true,
         uiModules: normalizeUiModules(data.settings?.uiModules),
       },
       exercises: normalizeExercises(data.exercises),
@@ -3471,7 +3625,7 @@ function bindEvents() {
   $("#setRows").addEventListener("input", (event) => {
     const target = event.target;
     if (!target.dataset.field) return;
-    draftSets[Number(target.dataset.index)][target.dataset.field] = target.value;
+    draftSets[Number(target.dataset.index)][target.dataset.field] = target.dataset.field === "weight" ? weightFromDisplay(target.value) : target.value;
     renderFocusMetric();
   });
 
@@ -3546,7 +3700,7 @@ function bindEvents() {
   $("#barWeightSelect").addEventListener("change", () => {
     const exercise = exerciseById($("#exerciseSelect").value);
     if (exercise) {
-      exercise.barWeight = Number($("#barWeightSelect").value) || 20;
+      exercise.barWeight = weightFromDisplay($("#barWeightSelect").value) || 20;
       saveState();
     }
     renderPlateResult();
@@ -3599,6 +3753,7 @@ function bindEvents() {
     if (!set) return;
     if (field === "type") set.type = event.target.value;
     else if (field === "rpe") set.rpe = event.target.value === "" ? "" : Number(event.target.value);
+    else if (field === "weight") set.weight = weightFromDisplay(event.target.value);
     else set[field] = Number(event.target.value) || 0;
   });
   $("#templateExerciseEditor").addEventListener("change", (event) => {
@@ -3771,7 +3926,7 @@ function bindEvents() {
       if (!record) return;
       editingBodyDate = record.date;
       $("#bodyDate").value = record.date;
-      $("#bodyWeight").value = record.weight || "";
+      $("#bodyWeight").value = record.weight ? weightInputValue(record.weight, 1) : "";
       $("#bodyFat").value = record.bodyFat || "";
       $("#saveBodyRecordButton").textContent = "更新身体记录";
       return;
@@ -3903,6 +4058,15 @@ function bindEvents() {
     showToast(wasEditing ? "动作已更新" : "动作已添加");
   });
 
+  $$("[data-onboarding-next]").forEach((button) => button.addEventListener("click", () => setOnboardingStep(button.dataset.onboardingNext)));
+  $$("[data-onboarding-back]").forEach((button) => button.addEventListener("click", () => setOnboardingStep(button.dataset.onboardingBack)));
+  $("#onboardingDays").addEventListener("change", renderOnboardingTemplates);
+  $$("input[name='onboardingNutrition']").forEach((input) => input.addEventListener("change", renderOnboardingNutritionState));
+  $("#finishOnboardingButton").addEventListener("click", finishOnboarding);
+  $("#onboardingDialog").addEventListener("cancel", (event) => {
+    if (!state.settings.onboardingCompleted) event.preventDefault();
+  });
+
   $("#themeQuickToggleButton").addEventListener("click", () => {
     const next = effectiveTheme() === "light" ? "dark" : "light";
     setThemeMode(next);
@@ -3911,6 +4075,8 @@ function bindEvents() {
 
   $("#settingsButton").addEventListener("click", () => {
     $("#themeModeInput").value = state.settings.theme || "system";
+    $("#weightUnitInput").value = currentWeightUnit();
+    $("#nutritionEnabledInput").checked = state.settings.nutritionEnabled !== false;
     renderUiModules();
     $("#calorieGoalInput").value = state.settings.calorieGoal;
     $("#proteinGoalInput").value = state.settings.proteinGoal;
@@ -3918,6 +4084,11 @@ function bindEvents() {
     $("#fatGoalInput").value = state.settings.fatGoal;
     $("#restSecondsInput").value = state.settings.restSeconds;
     $("#settingsDialog").showModal();
+  });
+
+  $("#restartOnboardingButton").addEventListener("click", () => {
+    $("#settingsDialog").close();
+    openOnboarding(true);
   });
 
   $("#exportDataButton").addEventListener("click", exportData);
@@ -3932,6 +4103,8 @@ function bindEvents() {
     if (submitterValue === "cancel") return;
     event.preventDefault();
     state.settings.theme = ["system", "dark", "light"].includes($("#themeModeInput").value) ? $("#themeModeInput").value : "system";
+    state.settings.weightUnit = $("#weightUnitInput").value === "lb" ? "lb" : "kg";
+    state.settings.nutritionEnabled = $("#nutritionEnabledInput").checked;
     state.settings.uiModules = normalizeUiModules(Object.fromEntries($$("[data-ui-module]").map((input) => [input.dataset.uiModule, input.checked])));
     state.settings.calorieGoal = Math.max(800, Number($("#calorieGoalInput").value) || 2200);
     state.settings.proteinGoal = Math.max(0, Number($("#proteinGoalInput").value) || 0);
@@ -3942,6 +4115,7 @@ function bindEvents() {
     applyTheme();
     $("#settingsDialog").close();
     renderAll();
+    if (!state.settings.nutritionEnabled && $('.page[data-page="calories"]')?.classList.contains('active')) navigate('dashboard');
     showToast("设置已保存");
   });
 }
@@ -3952,6 +4126,7 @@ $("#workoutDate").value = localDateISO();
 applyTheme();
 bindEvents();
 renderAll();
+if (!state.settings.onboardingCompleted) setTimeout(() => openOnboarding(false), 20);
 
 themeMediaQuery.addEventListener?.("change", () => {
   if ((state.settings.theme || "system") === "system") applyTheme("system");
