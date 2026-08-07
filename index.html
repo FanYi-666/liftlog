@@ -24,7 +24,7 @@
     })();
   </script>
   <link rel="manifest" href="manifest.webmanifest" />
-  <link rel="stylesheet" href="styles.css?v=17" />
+  <link rel="stylesheet" href="styles.css?v=18" />
 </head>
 <body>
   <div class="app-shell">
@@ -41,46 +41,43 @@
 
     <main>
       <section class="page active" data-page="dashboard">
-        <div class="dashboard-overview">
-          <article class="hero-card dashboard-food-card clickable-card" data-nav-target="calories">
-            <div class="dashboard-card-main">
-              <div class="dashboard-card-head">
-                <div>
-                  <p class="eyebrow">NUTRITION</p>
-                  <h2>今日饮食</h2>
-                </div>
-                <span class="dashboard-link">记录饮食 ›</span>
-              </div>
-              <div class="hero-number"><span id="todayCalories">0</span><small> kcal</small></div>
-              <p class="muted hero-detail">目标 <span id="todayCalorieGoal">2200</span> · <span id="calorieDeltaLabel">剩余 2200 kcal</span></p>
+        <section class="today-summary" aria-label="今日概览">
+          <article class="today-summary-row food-summary-row clickable-card" data-nav-target="calories">
+            <div class="today-row-label">
+              <strong>饮食</strong>
+              <span id="calorieDeltaLabel">剩余 2200 kcal</span>
             </div>
-            <div class="ring" id="calorieRing" aria-label="今日饮食热量进度"><span id="caloriePercent">0%</span></div>
+            <div class="today-row-value">
+              <strong><span id="todayCalories">0</span></strong>
+              <small>/ <span id="todayCalorieGoal">2200</span> kcal</small>
+            </div>
+            <b class="row-chevron">›</b>
+            <div class="today-progress" id="calorieRing" aria-label="今日饮食热量进度"><i></i></div>
+            <span class="visually-hidden" id="caloriePercent">0%</span>
           </article>
 
-          <article class="dashboard-training-card clickable-card" data-nav-target="log">
-            <div class="dashboard-card-head">
-              <div>
-                <p class="eyebrow">TRAINING</p>
-                <h2>今日训练</h2>
-              </div>
-              <span class="dashboard-link">开始训练 ›</span>
+          <article class="today-summary-row training-summary-row clickable-card" data-nav-target="log">
+            <div class="today-row-label">
+              <strong>训练</strong>
+              <span id="todayTrainingState">尚未训练</span>
             </div>
-            <div class="dashboard-training-metrics">
-              <div><span>组数</span><strong id="todaySets">0</strong><small>组</small></div>
-              <div><span>次数</span><strong id="todayReps">0</strong><small>次</small></div>
-              <div><span>负重容量</span><strong id="todayVolume">0</strong><small>kg</small></div>
+            <div class="today-training-values">
+              <span><strong id="todaySets">0</strong><small>组</small></span>
+              <span><strong id="todayReps">0</strong><small>次</small></span>
+              <span><strong id="todayVolume">0</strong><small>kg</small></span>
             </div>
+            <b class="row-chevron">›</b>
           </article>
-        </div>
 
-        <article class="dashboard-plan-strip clickable-card" id="dashboardPlanStrip" data-nav-target="log">
-          <div>
-            <p class="eyebrow">TODAY PLAN</p>
-            <strong id="dashboardPlanName">今天未安排训练</strong>
-            <span id="dashboardPlanMeta">打开训练页设置周计划</span>
-          </div>
-          <b>›</b>
-        </article>
+          <article class="today-summary-row plan-summary-row clickable-card" id="dashboardPlanStrip" data-nav-target="log">
+            <div class="today-row-label">
+              <strong>计划</strong>
+              <span id="dashboardPlanMeta">打开训练页设置周计划</span>
+            </div>
+            <div class="today-plan-value" id="dashboardPlanName">今天未安排训练</div>
+            <b class="row-chevron">›</b>
+          </article>
+        </section>
 
         <section class="section-block" data-module-key="dashboardChart">
           <div class="section-heading">
@@ -979,6 +976,6 @@
   </div>
 
   <div id="toast" class="toast" role="status"></div>
-  <script src="app.js?v=17"></script>
+  <script src="app.js?v=18"></script>
 </body>
 </html>

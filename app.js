@@ -2264,11 +2264,12 @@ function renderDashboard() {
     ? `剩余 ${formatNumber(delta)} kcal`
     : `超出 ${formatNumber(Math.abs(delta))} kcal`;
   $("#caloriePercent").textContent = `${rawPercent}%`;
-  $("#calorieRing").style.setProperty("--progress", `${ringPercent * 3.6}deg`);
+  $("#calorieRing").style.setProperty("--progress-percent", `${ringPercent}%`);
 
   $("#todaySets").textContent = formatNumber(todayStats.sets);
   $("#todayReps").textContent = formatNumber(todayStats.reps);
   $("#todayVolume").textContent = formatNumber(todayStats.volume);
+  if ($("#todayTrainingState")) $("#todayTrainingState").textContent = todayRecords.length ? `已记录 ${todayRecords.length} 个动作` : "尚未训练";
 
   const weekday = new Intl.DateTimeFormat("zh-CN", { month: "long", day: "numeric", weekday: "long" }).format(new Date());
   $("#todayLabel").textContent = weekday;
