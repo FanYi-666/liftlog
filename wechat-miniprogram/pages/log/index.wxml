@@ -1,0 +1,35 @@
+<view class="container">
+  <view class="eyebrow">TRAINING</view>
+  <view class="title">记录训练动作</view>
+  <view class="muted page-note">训练数据只记录动作、重量、次数和组数，不参与饮食热量统计。</view>
+
+  <view class="card">
+    <view class="label">训练动作</view>
+    <picker mode="selector" range="{{exerciseNames}}" value="{{exerciseIndex}}" bindchange="changeExercise">
+      <view class="picker">{{exerciseNames[exerciseIndex] || '请选择动作'}}</view>
+    </picker>
+
+    <view class="set-head">
+      <text>组</text><text>重量 kg</text><text>次数</text><text></text>
+    </view>
+    <view class="set-row" wx:for="{{sets}}" wx:key="index">
+      <view class="set-index">{{index + 1}}</view>
+      <input class="input set-input" type="digit" value="{{item.weight}}" data-index="{{index}}" data-field="weight" bindinput="setSetField" placeholder="0" />
+      <input class="input set-input" type="number" value="{{item.reps}}" data-index="{{index}}" data-field="reps" bindinput="setSetField" placeholder="0" />
+      <button class="remove" data-index="{{index}}" bindtap="removeSet">×</button>
+    </view>
+
+    <view class="actions-row">
+      <button class="secondary" bindtap="addSet">＋ 添加一组</button>
+      <button class="secondary" bindtap="copyLast">复制上次</button>
+    </view>
+  </view>
+
+  <button class="primary" bindtap="saveWorkout">保存这个动作</button>
+
+  <view class="section-title">自定义动作</view>
+  <view class="card custom-row">
+    <input class="input" value="{{newExerciseName}}" bindinput="newExerciseInput" placeholder="例如：上斜哑铃卧推" />
+    <button class="secondary add-exercise" bindtap="addExercise">添加</button>
+  </view>
+</view>

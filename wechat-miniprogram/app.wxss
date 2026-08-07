@@ -1,0 +1,27 @@
+page {
+  background: #0c0e10;
+  color: #f5f7f8;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+.container { padding: 28rpx 28rpx 48rpx; }
+.eyebrow { color: #b9ff63; font-size: 20rpx; font-weight: 700; letter-spacing: 4rpx; margin-bottom: 12rpx; }
+.title { font-size: 48rpx; font-weight: 800; margin-bottom: 34rpx; }
+.card { background: #15181c; border: 1rpx solid #2a3037; border-radius: 32rpx; padding: 28rpx; margin-bottom: 20rpx; }
+.muted { color: #8f99a4; font-size: 24rpx; }
+.metric { font-size: 54rpx; font-weight: 800; margin-top: 12rpx; }
+.metric-small { font-size: 34rpx; font-weight: 800; }
+.accent { color: #b9ff63; }
+.btn { border-radius: 24rpx; background: #b9ff63; color: #10130d; font-size: 28rpx; font-weight: 800; }
+.btn-secondary { border-radius: 24rpx; background: #1c2025; color: #f5f7f8; border: 1rpx solid #2a3037; font-size: 26rpx; }
+.primary { width:100%; border-radius:24rpx; background:#b9ff63; color:#10130d; font-size:28rpx; font-weight:800; }
+.secondary { border-radius:22rpx; background:#1c2025; color:#f5f7f8; border:1rpx solid #2a3037; font-size:24rpx; }
+.page-note { margin-top:-18rpx; margin-bottom:28rpx; line-height:1.6; }
+button::after { border:none; }
+.input, .picker { background: #15181c; border: 1rpx solid #2a3037; border-radius: 22rpx; padding: 24rpx; color: #f5f7f8; }
+.label { display: block; color: #8f99a4; font-size: 22rpx; margin-bottom: 10rpx; }
+.field { margin-bottom: 22rpx; }
+.row { display: flex; gap: 16rpx; align-items: center; }
+.grow { flex: 1; }
+.section-title { font-size: 34rpx; font-weight: 800; margin: 36rpx 0 18rpx; }
+.empty { color: #8f99a4; text-align: center; padding: 48rpx 24rpx; border: 1rpx dashed #2a3037; border-radius: 28rpx; }

@@ -1,0 +1,13 @@
+{
+  "name": "LiftLog 健身与饮食记录",
+  "short_name": "LiftLog",
+  "description": "训练动作、阶段趋势与每日饮食热量记录",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#0c0e10",
+  "theme_color": "#111316",
+  "orientation": "portrait-primary",
+  "lang": "zh-CN",
+  "categories": ["fitness", "health", "lifestyle"]
+}

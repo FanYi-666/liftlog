@@ -1,0 +1,6 @@
+{
+  "desc": "LiftLog sitemap",
+  "rules": [
+    { "action": "allow", "page": "*" }
+  ]
+}

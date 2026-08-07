@@ -1,0 +1,19 @@
+.page-note { margin:12rpx 0 28rpx; line-height:1.6; }
+.summary-card { display:flex; align-items:center; justify-content:space-between; }
+.big-number { margin-top:10rpx; font-size:62rpx; font-weight:900; letter-spacing:-2rpx; }
+.big-number text { font-size:24rpx; color:#8f99a4; font-weight:500; }
+.summary-side { text-align:right; color:#8f99a4; font-size:22rpx; line-height:1.8; }
+.accent { color:#b9ff63; font-weight:800; }
+.form-card { margin-top:18rpx; }
+.two-fields { display:grid; grid-template-columns:1fr 1fr; gap:16rpx; }
+.top-gap { margin-top:20rpx; }
+.save-food { margin-top:22rpx; }
+.entry-row { display:flex; align-items:center; justify-content:space-between; }
+.entry-name { font-weight:800; margin-bottom:6rpx; }
+.entry-actions { display:flex; align-items:center; gap:12rpx; }
+.entry-calories { color:#b9ff63; font-weight:800; font-size:24rpx; }
+.delete-btn { margin:0; padding:8rpx 12rpx; min-width:0; background:rgba(255,127,115,.1); color:#ff7f73; border-radius:14rpx; font-size:20rpx; line-height:1.2; }
+.day-list { padding-top:8rpx; padding-bottom:8rpx; }
+.day-row { display:flex; justify-content:space-between; align-items:center; padding:20rpx 0; border-bottom:1rpx solid #2a3037; font-size:24rpx; }
+.day-row:last-child { border-bottom:0; }
+.day-right { display:flex; flex-direction:column; align-items:flex-end; gap:4rpx; }

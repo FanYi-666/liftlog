@@ -1,0 +1,32 @@
+{
+  "pages": [
+    "pages/dashboard/index",
+    "pages/calories/index",
+    "pages/log/index",
+    "pages/analytics/index",
+    "pages/history/index",
+    "pages/settings/index"
+  ],
+  "window": {
+    "navigationBarTitleText": "LiftLog",
+    "navigationBarBackgroundColor": "#0c0e10",
+    "navigationBarTextStyle": "white",
+    "backgroundColor": "#0c0e10",
+    "backgroundTextStyle": "dark"
+  },
+  "tabBar": {
+    "color": "#7f8994",
+    "selectedColor": "#b9ff63",
+    "backgroundColor": "#131619",
+    "borderStyle": "black",
+    "list": [
+      { "pagePath": "pages/dashboard/index", "text": "概览" },
+      { "pagePath": "pages/calories/index", "text": "饮食" },
+      { "pagePath": "pages/log/index", "text": "训练" },
+      { "pagePath": "pages/analytics/index", "text": "趋势" },
+      { "pagePath": "pages/history/index", "text": "历史" }
+    ]
+  },
+  "style": "v2",
+  "sitemapLocation": "sitemap.json"
+}

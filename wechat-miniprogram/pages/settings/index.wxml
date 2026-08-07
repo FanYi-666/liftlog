@@ -1,0 +1,12 @@
+<view class="container">
+  <view class="eyebrow">SETTINGS</view>
+  <view class="title">饮食热量设置</view>
+
+  <view class="card">
+    <view class="label">每日摄入目标（kcal）</view>
+    <input class="input" type="number" value="{{calorieGoal}}" bindinput="setGoal" />
+    <view class="muted helper">这个目标只用于每天饮食摄入的对比，不与训练动作或训练容量混算。</view>
+  </view>
+
+  <button class="primary" bindtap="save">保存设置</button>
+</view>

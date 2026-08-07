@@ -1,0 +1,821 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#111316" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="LiftLog" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <title>LiftLog · 健身与饮食记录</title>
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="stylesheet" href="styles.css?v=14" />
+</head>
+<body>
+  <div class="app-shell">
+    <header class="topbar">
+      <div>
+        <p class="eyebrow" id="todayLabel">今天</p>
+        <h1>LiftLog</h1>
+      </div>
+      <button class="icon-button" id="settingsButton" aria-label="设置">⚙</button>
+    </header>
+
+    <main>
+      <section class="page active" data-page="dashboard">
+        <div class="dashboard-overview">
+          <article class="hero-card dashboard-food-card clickable-card" data-nav-target="calories">
+            <div class="dashboard-card-main">
+              <div class="dashboard-card-head">
+                <div>
+                  <p class="eyebrow">NUTRITION</p>
+                  <h2>今日饮食</h2>
+                </div>
+                <span class="dashboard-link">记录饮食 ›</span>
+              </div>
+              <div class="hero-number"><span id="todayCalories">0</span><small> kcal</small></div>
+              <p class="muted hero-detail">目标 <span id="todayCalorieGoal">2200</span> · <span id="calorieDeltaLabel">剩余 2200 kcal</span></p>
+            </div>
+            <div class="ring" id="calorieRing" aria-label="今日饮食热量进度"><span id="caloriePercent">0%</span></div>
+          </article>
+
+          <article class="dashboard-training-card clickable-card" data-nav-target="log">
+            <div class="dashboard-card-head">
+              <div>
+                <p class="eyebrow">TRAINING</p>
+                <h2>今日训练</h2>
+              </div>
+              <span class="dashboard-link">开始训练 ›</span>
+            </div>
+            <div class="dashboard-training-metrics">
+              <div><span>组数</span><strong id="todaySets">0</strong><small>组</small></div>
+              <div><span>次数</span><strong id="todayReps">0</strong><small>次</small></div>
+              <div><span>负重容量</span><strong id="todayVolume">0</strong><small>kg</small></div>
+            </div>
+          </article>
+        </div>
+
+        <article class="dashboard-plan-strip clickable-card" id="dashboardPlanStrip" data-nav-target="log">
+          <div>
+            <p class="eyebrow">TODAY PLAN</p>
+            <strong id="dashboardPlanName">今天未安排训练</strong>
+            <span id="dashboardPlanMeta">打开训练页设置周计划</span>
+          </div>
+          <b>›</b>
+        </article>
+
+        <section class="section-block">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">最近 7 天</p>
+              <h2>负重训练容量</h2>
+            </div>
+            <button class="text-button" data-nav-target="analytics">看动作趋势</button>
+          </div>
+          <div class="mini-chart" id="weeklyChart"></div>
+        </section>
+
+        <section class="section-block">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">最近训练</p>
+              <h2>动作记录</h2>
+            </div>
+          </div>
+          <div id="recentExercises" class="stack-list"></div>
+        </section>
+      </section>
+
+      <section class="page" data-page="calories">
+        <div class="page-title nutrition-title">
+          <div>
+            <p class="eyebrow">NUTRITION</p>
+            <h2>饮食记录</h2>
+          </div>
+          <div class="nutrition-date-control">
+            <label for="foodDate">日期</label>
+            <input id="foodDate" type="date" />
+          </div>
+        </div>
+
+        <div class="nutrition-summary-card">
+          <div class="nutrition-summary-head">
+            <div>
+              <span class="summary-label"><span id="foodDateLabel">今天</span>摄入</span>
+              <div class="nutrition-total"><span id="foodDayTotal">0</span><small>kcal</small></div>
+            </div>
+            <div class="nutrition-goal-copy">
+              <span>目标 <strong id="foodGoal">2200</strong></span>
+              <strong class="accent-text" id="foodRemaining">剩余 2200 kcal</strong>
+            </div>
+          </div>
+          <div class="nutrition-progress-track" aria-label="当日饮食热量进度">
+            <div class="nutrition-progress-bar" id="foodProgressBar"></div>
+          </div>
+          <div class="nutrition-progress-meta"><span id="foodProgressMeta">0%</span><span>每日摄入进度</span></div>
+        </div>
+
+        <div class="food-quick-card">
+          <div class="food-quick-head">
+            <div>
+              <p class="eyebrow">QUICK ADD</p>
+              <h3>快速记一餐</h3>
+            </div>
+            <span class="muted">选餐次 → 填食物 → kcal</span>
+          </div>
+          <div class="meal-chips" id="mealQuickSelect" aria-label="选择餐次">
+            <button type="button" data-meal-quick="早餐">早餐</button>
+            <button type="button" class="active" data-meal-quick="午餐">午餐</button>
+            <button type="button" data-meal-quick="晚餐">晚餐</button>
+            <button type="button" data-meal-quick="加餐">加餐</button>
+          </div>
+          <select id="mealSelect" class="visually-hidden-control" aria-label="餐次">
+            <option>早餐</option>
+            <option selected>午餐</option>
+            <option>晚餐</option>
+            <option>加餐</option>
+          </select>
+          <div class="food-entry-grid">
+            <div class="field-group food-field">
+              <label for="foodName">食物 / 餐食</label>
+              <input id="foodName" placeholder="例如 鸡胸饭" />
+            </div>
+            <div class="field-group food-field calorie-field">
+              <label for="foodCalories">热量</label>
+              <div class="calorie-input-wrap"><input id="foodCalories" type="number" min="1" inputmode="numeric" placeholder="520" /><span>kcal</span></div>
+            </div>
+          </div>
+          <div class="form-actions food-form-actions">
+            <button class="secondary-button cancel-edit hidden" id="cancelFoodEditButton" type="button">取消编辑</button>
+            <button class="primary-button" id="saveFoodButton">＋ 记入当天</button>
+          </div>
+        </div>
+
+        <section class="section-block compact">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">当天明细</p>
+              <h2>吃了什么</h2>
+            </div>
+          </div>
+          <div id="foodEntries" class="stack-list"></div>
+        </section>
+
+        <section class="section-block">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">最近 7 天</p>
+              <h2>每日摄入</h2>
+            </div>
+          </div>
+          <div id="foodWeek" class="history-list"></div>
+        </section>
+      </section>
+
+      <section class="page" data-page="log">
+        <div class="page-title training-title">
+          <div>
+            <p class="eyebrow">TRAINING</p>
+            <h2>开始训练</h2>
+            <p class="muted page-note">快速记录每一组，完成后自动进入休息。</p>
+          </div>
+          <div class="feature-strip" aria-label="训练功能">
+            <span>模板</span><span>超级组</span><span>实时对比</span><span>热身</span><span>杠铃片</span>
+          </div>
+        </div>
+
+        <div class="today-plan-card" id="todayPlanCard">
+          <div class="today-plan-copy">
+            <p class="eyebrow">TODAY PLAN</p>
+            <h3 id="todayPlanName">今天未安排训练</h3>
+            <p class="muted" id="todayPlanMeta">可以在周计划里自由安排训练日、内容和具体时间。</p>
+          </div>
+          <div class="today-plan-actions">
+            <button class="primary-button compact-primary hidden" id="startTodayPlanButton" type="button">开始今日计划</button>
+            <button class="secondary-button" id="weeklyPlanButton" type="button">周计划</button>
+          </div>
+        </div>
+
+        <div class="smart-training-card">
+          <div>
+            <p class="eyebrow">SMART PLAN</p>
+            <h3 id="smartProfileSummary">增肌 · 中级 · 每周 4 天 · 60 分钟</h3>
+            <p class="muted">按目标、水平、时间和器械生成训练；也可以只生成今天这一场。</p>
+          </div>
+          <div class="smart-training-actions">
+            <button class="secondary-button" id="smartPlanButton" type="button">训练目标 / 自动周计划</button>
+            <button class="secondary-button" id="workoutCreatorButton" type="button">Workout Creator</button>
+          </div>
+        </div>
+
+        <section class="recovery-advisor-card" id="recoveryAdvisorCard">
+          <div class="recovery-advisor-head">
+            <div>
+              <p class="eyebrow">RECOVERY ADVISOR</p>
+              <h3 id="recoveryRecommendationTitle">正在分析最近训练</h3>
+            </div>
+            <span id="recoveryRecommendationBadge" class="recovery-status-badge">负荷估算</span>
+          </div>
+          <p class="muted" id="recoveryRecommendationBody">基于最近训练时间、正式组数、RPE 与训练反馈估算，不是生理测量。</p>
+          <div id="recoveryQuickMuscles" class="recovery-quick-muscles"></div>
+          <div class="recovery-advisor-actions">
+            <button class="secondary-button" id="recoveryWorkoutButton" type="button">按恢复生成今天训练</button>
+            <button class="secondary-button" id="adaptivePlanButton" type="button">优化未来 7 天</button>
+          </div>
+        </section>
+
+        <div class="template-card tool-card">
+          <div class="template-head">
+            <div>
+              <p class="eyebrow">TEMPLATES</p>
+              <h3>训练模板</h3>
+            </div>
+            <span class="template-status" id="templateStatus">未使用模板</span>
+          </div>
+          <div class="template-controls template-controls-v2">
+            <select id="templateSelect" aria-label="训练模板"></select>
+            <button class="secondary-button" id="startTemplateButton" type="button">开始模板</button>
+            <button class="secondary-button" id="manageTemplatesButton" type="button">管理模板</button>
+            <button class="secondary-button" id="repeatLastWorkoutButton" type="button">重复上次整场</button>
+            <button class="secondary-button" id="saveTemplateButton" type="button">把当天训练存为模板</button>
+          </div>
+        </div>
+
+        <div class="two-column-fields training-top-fields workout-context-card">
+          <div class="field-group">
+            <label for="workoutDate">训练日期</label>
+            <input id="workoutDate" type="date" />
+          </div>
+          <div class="field-group exercise-context-field">
+            <div class="field-label-row">
+              <label for="exercisePickerButton">训练动作</label>
+              <button class="text-button compact-text-button" id="manageExercisesButton" type="button">管理动作</button>
+            </div>
+            <button class="exercise-picker-button" id="exercisePickerButton" type="button">
+              <span>
+                <strong id="exercisePickerName">选择动作</strong>
+                <small id="exercisePickerMeta">搜索或从最近动作中选择</small>
+              </span>
+              <b>更换 ›</b>
+            </button>
+            <select id="exerciseSelect" class="visually-hidden-control" aria-label="训练动作"></select>
+          </div>
+        </div>
+
+        <div class="pr-grid" id="exercisePrGrid">
+          <article class="metric-card"><span id="exercisePrimaryStatLabel">历史最高重量</span><strong id="exerciseBestWeight">0</strong><small id="exercisePrimaryStatUnit">kg</small></article>
+          <article class="metric-card"><span id="exerciseSecondaryStatLabel">预计 1RM</span><strong id="exerciseBest1rm">0</strong><small id="exerciseSecondaryStatUnit">kg</small></article>
+          <article class="metric-card wide"><span>上次训练</span><strong class="last-workout-text" id="exerciseLastWorkout">暂无记录</strong></article>
+        </div>
+
+        <article class="progression-suggestion-card" id="progressionSuggestionCard">
+          <div><p class="eyebrow">NEXT SESSION</p><h3>下一次怎么进步</h3></div>
+          <strong id="progressionSuggestionTitle">先完成一次这个动作</strong>
+          <p class="muted" id="progressionSuggestionBody">有训练记录后，会根据重量、次数、RPE 和训练反馈给出下一次建议。</p>
+        </article>
+
+        <div class="training-performance-grid">
+          <article class="focus-metric-card">
+            <div class="tool-card-head">
+              <div>
+                <p class="eyebrow">FOCUS</p>
+                <h3>和上次实时对比</h3>
+              </div>
+              <select id="focusMetricSelect" aria-label="Focus Metric"></select>
+            </div>
+            <div class="focus-values">
+              <div><span>当前</span><strong id="focusCurrentValue">0</strong></div>
+              <div><span>上次</span><strong id="focusPreviousValue">—</strong></div>
+              <div><span>变化</span><strong id="focusDeltaValue">—</strong></div>
+            </div>
+            <p class="focus-hint" id="focusHint">填写当前组后会即时更新。</p>
+          </article>
+
+          <article class="training-tools-card">
+            <div class="training-tools-row">
+              <div class="field-group compact-field">
+                <label for="exerciseRestSelect">该动作休息</label>
+                <select id="exerciseRestSelect">
+                  <option value="60">60 秒</option>
+                  <option value="90">90 秒</option>
+                  <option value="120">120 秒</option>
+                  <option value="150">150 秒</option>
+                  <option value="180">180 秒</option>
+                  <option value="240">240 秒</option>
+                  <option value="300">300 秒</option>
+                </select>
+              </div>
+              <div class="group-status-block">
+                <span>训练编组</span>
+                <strong id="groupStatus">普通顺序</strong>
+              </div>
+            </div>
+            <div class="training-tool-buttons">
+              <button class="secondary-button" id="groupBuilderButton" type="button">超级组 / Circuit</button>
+              <button class="secondary-button" id="warmupCalculatorButton" type="button">热身计算器</button>
+              <button class="secondary-button" id="plateCalculatorButton" type="button">杠铃片计算器</button>
+              <button class="text-button compact-text-button hidden" id="clearGroupButton" type="button">退出编组</button>
+            </div>
+          </article>
+        </div>
+
+        <div class="set-card">
+          <div class="set-card-head">
+            <div>
+              <p class="muted">当前动作</p>
+              <h3 id="currentExerciseName">卧推</h3>
+            </div>
+            <button class="secondary-button small" id="copyLastButton">复制上次</button>
+          </div>
+          <div class="set-table-head" id="setTableHead">
+            <span>类型</span><span id="weightColumnLabel">kg</span><span>次数</span><span>RPE</span><span>完成</span><span></span>
+          </div>
+          <div id="setRows" class="set-rows"></div>
+          <button class="add-set-button" id="addSetButton">＋ 添加一组</button>
+          <div class="set-legend"><span><b>N</b>正式</span><span><b>W</b>热身</span><span><b>D</b>递减</span><span><b>F</b>力竭</span><span>RPE 8≈余2次</span></div>
+        </div>
+
+        <div class="field-group workout-note-field">
+          <label for="workoutNote">动作备注（可选）</label>
+          <input id="workoutNote" maxlength="80" placeholder="例如：最后一组 RPE 9、左肩感觉正常" />
+        </div>
+
+        <div class="form-actions">
+          <button class="secondary-button cancel-edit hidden" id="cancelWorkoutEditButton" type="button">取消编辑</button>
+          <button class="primary-button training-save" id="saveWorkoutButton">保存动作 · 继续训练</button>
+        </div>
+
+        <section class="section-block workout-day-section">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">SESSION</p>
+              <h2><span id="workoutDayLabel">今天</span>的训练</h2>
+            </div>
+            <strong class="session-summary" id="workoutDaySummary">0 组 · 0 kg</strong>
+          </div>
+          <div id="workoutDayList" class="stack-list"></div>
+        </section>
+      </section>
+
+      <section class="page" data-page="analytics">
+        <div class="page-title analytics-title progress-page-title">
+          <div>
+            <p class="eyebrow">PROGRESS</p>
+            <h2>训练进度</h2>
+            <p class="muted page-note">先看整体训练节奏和肌群分布，再下钻到单个动作。</p>
+          </div>
+        </div>
+
+        <div class="progress-pulse-grid">
+          <article><span>本周训练</span><strong id="progressWeekDays">0</strong><small>天</small></article>
+          <article><span>连续活跃</span><strong id="progressStreakWeeks">0</strong><small>周</small></article>
+          <article><span>本周正式组</span><strong id="progressWeekSets">0</strong><small>组</small></article>
+          <article><span>本月训练</span><strong id="progressMonthDays">0</strong><small>天</small></article>
+        </div>
+
+        <section class="progress-compare-grid">
+          <article class="progress-compare-card">
+            <div class="progress-card-head"><div><p class="eyebrow">WEEK</p><h3>本周 vs 上周同期</h3></div><strong id="weekCompareBadge">—</strong></div>
+            <div id="weekCompareBody" class="compare-metrics"></div>
+          </article>
+          <article class="progress-compare-card">
+            <div class="progress-card-head"><div><p class="eyebrow">MONTH</p><h3>本月 vs 上月同期</h3></div><strong id="monthCompareBadge">—</strong></div>
+            <div id="monthCompareBody" class="compare-metrics"></div>
+          </article>
+        </section>
+
+        <section class="section-block recovery-progress-section">
+          <div class="section-heading">
+            <div><p class="eyebrow">RECOVERY</p><h2>肌群恢复估算</h2></div>
+            <span class="muted">负荷衰减模型 · 非生理测量</span>
+          </div>
+          <div id="muscleRecoveryGrid" class="muscle-recovery-grid"></div>
+        </section>
+
+        <section class="progress-compare-grid adaptive-insight-grid">
+          <article class="progress-compare-card">
+            <div class="progress-card-head"><div><p class="eyebrow">BALANCE</p><h3>训练分布提示</h3></div><strong id="balanceStatusBadge">—</strong></div>
+            <div id="balanceInsights" class="adaptive-insight-list"></div>
+          </article>
+          <article class="progress-compare-card">
+            <div class="progress-card-head"><div><p class="eyebrow">4 WEEKS</p><h3>阶段总结</h3></div><strong id="fourWeekBadge">—</strong></div>
+            <div id="fourWeekSummary" class="adaptive-insight-list"></div>
+          </article>
+        </section>
+
+        <section class="section-block muscle-progress-section">
+          <div class="section-heading">
+            <div><p class="eyebrow">MUSCLE LOAD</p><h2>本周肌群训练量</h2></div>
+            <span class="muted">按动作主肌群正式组数</span>
+          </div>
+          <div id="muscleHeatmap" class="muscle-heatmap"></div>
+          <div id="muscleWeekList" class="muscle-week-list"></div>
+        </section>
+
+        <section class="section-block calendar-section">
+          <div class="section-heading calendar-heading">
+            <div><p class="eyebrow">CALENDAR</p><h2 id="calendarTitle">训练日历</h2></div>
+            <div class="calendar-actions"><button id="calendarPrevButton" type="button">‹</button><button id="calendarTodayButton" type="button">本月</button><button id="calendarNextButton" type="button">›</button></div>
+          </div>
+          <div class="training-calendar-weekdays"><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span><span>日</span></div>
+          <div id="trainingCalendar" class="training-calendar"></div>
+        </section>
+
+        <div class="section-heading exercise-analysis-heading">
+          <div><p class="eyebrow">EXERCISE</p><h2>动作分析</h2></div>
+          <span class="mode-badge" id="analyticsModeBadge">负重动作</span>
+        </div>
+
+        <div class="analytics-controls analytics-toolbar">
+          <div class="field-group">
+            <label for="analyticsExercise">动作</label>
+            <select id="analyticsExercise"></select>
+          </div>
+          <div class="field-group">
+            <label for="rangeSelect">阶段</label>
+            <select id="rangeSelect">
+              <option value="7">7 天</option>
+              <option value="30" selected>30 天</option>
+              <option value="90">90 天</option>
+              <option value="365">1 年</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="metric-switch" id="metricSwitch" aria-label="趋势指标">
+          <button class="metric-switch-button active" data-metric="volume">训练容量</button>
+          <button class="metric-switch-button" data-metric="maxWeight">最高重量</button>
+          <button class="metric-switch-button" data-metric="sets">总组数</button>
+          <button class="metric-switch-button" data-metric="reps">总次数</button>
+        </div>
+
+        <div class="summary-strip progress-summary">
+          <div><span>总组数</span><strong id="rangeSets">0</strong></div>
+          <div><span>总次数</span><strong id="rangeReps">0</strong></div>
+          <div><span id="rangeThirdLabel">总容量</span><strong id="rangeVolume">0 kg</strong></div>
+          <div><span id="rangeFourthLabel">阶段最高重量</span><strong id="rangeMaxWeight">0 kg</strong></div>
+        </div>
+
+        <section class="rep-pr-card" id="repPrCard">
+          <div class="section-heading rep-pr-heading">
+            <div><p class="eyebrow">REP PR</p><h2 id="repPrTitle">次数档位 PR</h2></div>
+            <span class="muted" id="repPrHint">精确次数下的最高重量</span>
+          </div>
+          <div id="repPrGrid" class="rep-pr-grid"></div>
+        </section>
+
+        <section class="chart-card">
+          <div class="chart-card-head">
+            <div>
+              <p class="muted" id="chartMetricLabel">每天该动作训练容量</p>
+              <h3 id="chartExerciseTitle">卧推</h3>
+            </div>
+            <span class="chart-badge" id="chartMetricBadge">重量 × 次数</span>
+          </div>
+          <div id="exerciseTrendChart" class="trend-chart"></div>
+        </section>
+
+        <section class="section-block compact">
+          <div class="section-heading">
+            <div><p class="eyebrow">PR TIMELINE</p><h2>纪录时间线</h2></div>
+          </div>
+          <div id="prTimeline" class="pr-timeline"></div>
+        </section>
+
+        <section class="section-block compact">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">逐日明细</p>
+              <h2>每天每组与合计</h2>
+            </div>
+          </div>
+          <div id="exerciseHistory" class="history-list"></div>
+        </section>
+      </section>
+
+      <section class="page" data-page="history">
+        <div class="page-title">
+          <p class="eyebrow">HISTORY</p>
+          <h2>训练历史</h2>
+          <p class="muted page-note">按训练日回看动作和总量，点单条记录可直接编辑。</p>
+        </div>
+        <div class="history-overview">
+          <article><span>训练天数</span><strong id="historyDays">0</strong></article>
+          <article><span>总组数</span><strong id="historySets">0</strong></article>
+          <article><span>总次数</span><strong id="historyReps">0</strong></article>
+        </div>
+        <div id="historyPageList" class="history-list history-timeline"></div>
+      </section>
+    </main>
+
+    <nav class="bottom-nav" aria-label="主导航">
+      <button class="nav-item active" data-nav="dashboard"><span>⌂</span><small>概览</small></button>
+      <button class="nav-item" data-nav="calories"><span>◉</span><small>饮食</small></button>
+      <button class="nav-item nav-add" data-nav="log"><span>＋</span><small>训练</small></button>
+      <button class="nav-item" data-nav="analytics"><span>⌁</span><small>趋势</small></button>
+      <button class="nav-item" data-nav="history"><span>▤</span><small>历史</small></button>
+    </nav>
+  </div>
+
+  <dialog id="templateManagerDialog">
+    <div class="dialog-card template-manager-dialog-card">
+      <div class="dialog-head">
+        <div>
+          <p class="eyebrow">TEMPLATES</p>
+          <h2>模板管理</h2>
+        </div>
+        <button class="icon-button" id="closeTemplateManagerButton" type="button" aria-label="关闭">×</button>
+      </div>
+      <p class="helper-text">可以重命名、复制、删除模板，并调整动作顺序、组数和每组参数。</p>
+      <div id="templateManagerList" class="template-manager-list"></div>
+    </div>
+  </dialog>
+
+  <dialog id="templateEditorDialog">
+    <div class="dialog-card template-editor-dialog-card">
+      <div class="dialog-head">
+        <div>
+          <p class="eyebrow">EDIT TEMPLATE</p>
+          <h2>编辑训练模板</h2>
+        </div>
+        <button class="icon-button" id="closeTemplateEditorButton" type="button" aria-label="关闭">×</button>
+      </div>
+      <div class="field-group">
+        <label for="templateNameInput">模板名称</label>
+        <input id="templateNameInput" maxlength="40" />
+      </div>
+      <div id="templateExerciseEditor" class="template-exercise-editor"></div>
+      <div class="template-editor-actions">
+        <button class="secondary-button" id="addCurrentExerciseToTemplateButton" type="button">＋ 加入当前动作</button>
+        <button class="primary-button" id="saveTemplateEditsButton" type="button">保存模板修改</button>
+      </div>
+    </div>
+  </dialog>
+
+  <dialog id="weeklyPlanDialog">
+    <div class="dialog-card weekly-plan-dialog-card">
+      <div class="dialog-head">
+        <div>
+          <p class="eyebrow">WEEKLY PLAN</p>
+          <h2>每周训练安排</h2>
+        </div>
+        <button class="icon-button" id="closeWeeklyPlanButton" type="button" aria-label="关闭">×</button>
+      </div>
+      <p class="helper-text">先决定当天是“训练”还是“休息”。只有训练日才需要选择自由训练/模板和具体时间；休息日不保存时间。</p>
+      <div id="weeklyPlanRows" class="weekly-plan-rows"></div>
+      <button class="primary-button" id="saveWeeklyPlanButton" type="button">保存周计划</button>
+    </div>
+  </dialog>
+
+  <dialog id="smartPlanDialog">
+    <div class="dialog-card smart-plan-dialog-card">
+      <div class="dialog-head">
+        <div><p class="eyebrow">SMART PLAN</p><h2>训练目标与自动计划</h2></div>
+        <button class="icon-button" id="closeSmartPlanButton" type="button" aria-label="关闭">×</button>
+      </div>
+      <div class="smart-profile-grid">
+        <div class="field-group"><label for="trainingGoalInput">主要目标</label><select id="trainingGoalInput"><option value="hypertrophy">增肌</option><option value="strength">力量</option><option value="fatloss">减脂 / 体能</option></select></div>
+        <div class="field-group"><label for="trainingLevelInput">训练水平</label><select id="trainingLevelInput"><option value="beginner">新手</option><option value="intermediate">中级</option><option value="advanced">高级</option></select></div>
+        <div class="field-group"><label for="trainingDaysInput">每周训练</label><select id="trainingDaysInput"><option value="2">2 天</option><option value="3">3 天</option><option value="4">4 天</option><option value="5">5 天</option><option value="6">6 天</option></select></div>
+        <div class="field-group"><label for="trainingMinutesInput">单次时长</label><select id="trainingMinutesInput"><option value="30">30 分钟</option><option value="45">45 分钟</option><option value="60">60 分钟</option><option value="75">75 分钟</option><option value="90">90 分钟</option></select></div>
+      </div>
+      <div class="field-group"><label>可用器械</label><div class="equipment-chips" id="trainingEquipmentInputs"><label><input type="checkbox" value="barbell">杠铃</label><label><input type="checkbox" value="dumbbell">哑铃</label><label><input type="checkbox" value="machine">器械</label><label><input type="checkbox" value="bodyweight">自重</label><label><input type="checkbox" value="other">其他</label></div></div>
+      <p class="helper-text">自动生成时优先保留你在“周计划”里已经选好的训练日；如果数量不足，会自动均匀补足。你之后仍可自由改训练日和时间。</p>
+      <div class="smart-plan-actions"><button class="secondary-button" id="saveTrainingProfileButton" type="button">只保存设置</button><button class="primary-button" id="generateWeeklyPlanButton" type="button">生成一周训练计划</button></div>
+    </div>
+  </dialog>
+
+  <dialog id="workoutCreatorDialog">
+    <div class="dialog-card smart-plan-dialog-card">
+      <div class="dialog-head"><div><p class="eyebrow">WORKOUT CREATOR</p><h2>快速生成今天训练</h2></div><button class="icon-button" id="closeWorkoutCreatorButton" type="button" aria-label="关闭">×</button></div>
+      <div class="smart-profile-grid">
+        <div class="field-group"><label for="creatorTargetInput">训练重点</label><select id="creatorTargetInput"><option value="full">全身</option><option value="upper">上肢</option><option value="lower">下肢</option><option value="胸">胸</option><option value="背">背</option><option value="肩">肩</option><option value="二头">二头</option><option value="三头">三头</option><option value="股四头">股四头</option><option value="后链">后链</option></select></div>
+        <div class="field-group"><label for="creatorMinutesInput">可用时间</label><select id="creatorMinutesInput"><option value="30">30 分钟</option><option value="45">45 分钟</option><option value="60">60 分钟</option><option value="75">75 分钟</option></select></div>
+      </div>
+      <div id="creatorPreview" class="creator-preview"></div>
+      <div class="smart-plan-actions"><button class="secondary-button" id="saveCreatedWorkoutButton" type="button">保存为模板</button><button class="primary-button" id="startCreatedWorkoutButton" type="button">立即开始</button></div>
+    </div>
+  </dialog>
+
+  <dialog id="workoutFeedbackDialog">
+    <div class="dialog-card feedback-dialog-card">
+      <div class="dialog-head"><div><p class="eyebrow">FEEDBACK</p><h2>这次动作感觉怎样？</h2></div><button class="icon-button" id="closeWorkoutFeedbackButton" type="button" aria-label="关闭">×</button></div>
+      <p class="helper-text" id="feedbackExerciseLabel">这个反馈会用于调整下一次建议。</p>
+      <div class="feedback-options"><button data-workout-feedback="easy" type="button">太轻</button><button data-workout-feedback="good" type="button">合适</button><button data-workout-feedback="hard" type="button">太难</button></div>
+    </div>
+  </dialog>
+
+  <dialog id="adaptivePlanDialog">
+    <div class="dialog-card adaptive-plan-dialog-card">
+      <div class="dialog-head">
+        <div>
+          <p class="eyebrow">ADAPTIVE WEEK</p>
+          <h2>未来 7 天恢复调节</h2>
+        </div>
+        <button class="icon-button" id="closeAdaptivePlanButton" type="button" aria-label="关闭">×</button>
+      </div>
+      <p class="helper-text">只生成未来 7 天的临时模板调整，保留你原来的训练日和具体时间；基础周计划不会被改写。</p>
+      <div id="adaptivePlanPreview" class="adaptive-plan-preview"></div>
+      <div class="template-editor-actions">
+        <button class="secondary-button" id="clearAdaptivePlanButton" type="button">清除临时调整</button>
+        <button class="primary-button" id="applyAdaptivePlanButton" type="button">应用未来 7 天建议</button>
+      </div>
+    </div>
+  </dialog>
+
+  <dialog id="groupBuilderDialog">
+    <div class="dialog-card calculator-dialog-card">
+      <div class="dialog-head">
+        <div>
+          <p class="eyebrow">SUPERSET / CIRCUIT</p>
+          <h2>训练编组</h2>
+        </div>
+        <button class="icon-button" id="closeGroupBuilderButton" type="button" aria-label="关闭">×</button>
+      </div>
+      <div class="field-group">
+        <label for="groupModeSelect">编组方式</label>
+        <select id="groupModeSelect">
+          <option value="superset">超级组 · 2 个动作交替</option>
+          <option value="circuit">Circuit · 3 个及以上循环</option>
+        </select>
+      </div>
+      <p class="helper-text">保存当前动作后，会自动切到编组中的下一个动作。</p>
+      <div id="groupExerciseList" class="group-exercise-list"></div>
+      <button class="primary-button" id="applyGroupButton" type="button">开始编组训练</button>
+    </div>
+  </dialog>
+
+  <dialog id="warmupDialog">
+    <div class="dialog-card calculator-dialog-card">
+      <div class="dialog-head">
+        <div>
+          <p class="eyebrow">WARM-UP</p>
+          <h2>生成热身组</h2>
+        </div>
+        <button class="icon-button" id="closeWarmupButton" type="button" aria-label="关闭">×</button>
+      </div>
+      <div class="calculator-fields">
+        <div class="field-group">
+          <label for="warmupWorkWeight">工作重量（kg）</label>
+          <input id="warmupWorkWeight" type="number" min="1" step="0.5" inputmode="decimal" />
+        </div>
+        <div class="field-group">
+          <label for="warmupSetCount">热身组数</label>
+          <select id="warmupSetCount">
+            <option value="2">2 组</option>
+            <option value="3" selected>3 组</option>
+            <option value="4">4 组</option>
+          </select>
+        </div>
+      </div>
+      <div id="warmupPreview" class="calculator-preview"></div>
+      <button class="primary-button" id="applyWarmupButton" type="button">加入当前动作</button>
+    </div>
+  </dialog>
+
+  <dialog id="plateDialog">
+    <div class="dialog-card calculator-dialog-card">
+      <div class="dialog-head">
+        <div>
+          <p class="eyebrow">PLATES</p>
+          <h2>杠铃片计算器</h2>
+        </div>
+        <button class="icon-button" id="closePlateButton" type="button" aria-label="关闭">×</button>
+      </div>
+      <div class="calculator-fields">
+        <div class="field-group">
+          <label for="plateTargetWeight">目标重量（kg）</label>
+          <input id="plateTargetWeight" type="number" min="1" step="0.5" inputmode="decimal" />
+        </div>
+        <div class="field-group">
+          <label for="barWeightSelect">杠铃杆</label>
+          <select id="barWeightSelect">
+            <option value="20">20 kg</option>
+            <option value="15">15 kg</option>
+            <option value="10">10 kg</option>
+          </select>
+        </div>
+      </div>
+      <div id="plateResult" class="calculator-preview plate-preview"></div>
+      <p class="helper-text">按常见 20 / 15 / 10 / 5 / 2.5 / 1.25 kg 杠铃片计算每一侧。</p>
+    </div>
+  </dialog>
+
+  <dialog id="exercisePickerDialog">
+    <div class="dialog-card exercise-picker-dialog-card">
+      <div class="dialog-head">
+        <div>
+          <p class="eyebrow">EXERCISES</p>
+          <h2>选择训练动作</h2>
+        </div>
+        <button class="icon-button" id="closeExercisePickerButton" type="button" aria-label="关闭">×</button>
+      </div>
+      <div class="exercise-search-wrap">
+        <span>⌕</span>
+        <input id="exerciseSearchInput" type="search" placeholder="搜索动作，例如 卧推 / 俯卧撑" autocomplete="off" />
+      </div>
+      <div id="exercisePickerList" class="exercise-picker-list"></div>
+      <button class="secondary-button picker-new-button" id="pickerAddExerciseButton" type="button">＋ 新建动作</button>
+    </div>
+  </dialog>
+
+  <dialog id="exerciseManagerDialog">
+    <div class="dialog-card exercise-manager-dialog-card">
+      <div class="dialog-head">
+        <div>
+          <p class="eyebrow">MANAGE</p>
+          <h2>动作管理</h2>
+        </div>
+        <button class="icon-button" id="closeExerciseManagerButton" type="button" aria-label="关闭">×</button>
+      </div>
+      <p class="helper-text">可以修改动作名称和记录方式。已有训练记录会继续关联到这个动作。</p>
+      <div id="exerciseManagerList" class="exercise-manager-list"></div>
+      <button class="primary-button" id="managerAddExerciseButton" type="button">＋ 新建动作</button>
+    </div>
+  </dialog>
+
+  <dialog id="exerciseDialog">
+    <form method="dialog" id="exerciseForm" class="dialog-card">
+      <div class="dialog-head">
+        <div>
+          <p class="eyebrow" id="exerciseDialogEyebrow">新增动作</p>
+          <h2 id="exerciseDialogTitle">自定义训练动作</h2>
+        </div>
+        <button value="cancel" class="icon-button" aria-label="关闭">×</button>
+      </div>
+      <div class="field-group">
+        <label for="exerciseNameInput">动作名称</label>
+        <input id="exerciseNameInput" required placeholder="例如：上斜哑铃卧推、俯卧撑" />
+      </div>
+      <div class="field-group">
+        <label for="exerciseModeInput">记录方式</label>
+        <select id="exerciseModeInput">
+          <option value="weighted">负重动作 · 重量 + 次数</option>
+          <option value="bodyweight">自重动作 · 只记次数</option>
+        </select>
+      </div>
+      <div class="field-group">
+        <label for="exerciseMuscleInput">主肌群</label>
+        <select id="exerciseMuscleInput">
+          <option>胸</option><option>背</option><option>肩</option><option>二头</option><option>三头</option><option>股四头</option><option>后链</option><option>臀</option><option>小腿</option><option>核心</option><option>其他</option>
+        </select>
+      </div>
+      <div class="field-group">
+        <label for="exerciseEquipmentInput">主要器械</label>
+        <select id="exerciseEquipmentInput"><option value="barbell">杠铃</option><option value="dumbbell">哑铃</option><option value="machine">器械</option><option value="bodyweight">自重</option><option value="other">其他</option></select>
+      </div>
+      <p class="helper-text">主肌群用于训练量分析；器械类型用于 Workout Creator 和自动计划筛选动作。</p>
+      <button class="primary-button" id="exerciseFormSubmitButton" value="default">添加动作</button>
+    </form>
+  </dialog>
+
+  <dialog id="settingsDialog">
+    <form method="dialog" id="settingsForm" class="dialog-card">
+      <div class="dialog-head">
+        <div>
+          <p class="eyebrow">个人设置</p>
+          <h2>饮食热量目标</h2>
+        </div>
+        <button value="cancel" class="icon-button" aria-label="关闭">×</button>
+      </div>
+      <div class="field-group">
+        <label for="calorieGoalInput">每日摄入目标（kcal）</label>
+        <input id="calorieGoalInput" type="number" min="800" max="6000" step="10" required />
+      </div>
+      <div class="field-group">
+        <label for="restSecondsInput">默认组间休息（秒）</label>
+        <input id="restSecondsInput" type="number" min="15" max="600" step="15" required />
+      </div>
+      <p class="helper-text">饮食目标只用于每日摄入对比。休息计时会在你勾选“完成一组”后自动启动。</p>
+      <button class="primary-button" value="default">保存设置</button>
+      <div class="settings-divider"></div>
+      <div>
+        <p class="eyebrow">DATA</p>
+        <h3>数据备份</h3>
+        <p class="helper-text backup-note">训练和饮食目前保存在这个浏览器里。建议定期导出备份，换手机前尤其要备份。</p>
+      </div>
+      <div class="backup-actions">
+        <button class="secondary-button" id="exportDataButton" type="button">导出 JSON 备份</button>
+        <label class="secondary-button import-label" for="importDataInput">导入备份</label>
+        <input id="importDataInput" class="visually-hidden" type="file" accept="application/json,.json" />
+      </div>
+    </form>
+  </dialog>
+
+  <div id="restTimer" class="rest-timer hidden" role="status" aria-live="polite">
+    <div>
+      <span class="rest-timer-label">组间休息</span>
+      <strong id="restTimerValue">02:00</strong>
+    </div>
+    <div class="rest-timer-actions">
+      <button type="button" id="restMinusButton">−15</button>
+      <button type="button" id="restPlusButton">＋15</button>
+      <button type="button" id="restSkipButton">跳过</button>
+    </div>
+  </div>
+
+  <div id="toast" class="toast" role="status"></div>
+  <script src="app.js?v=14"></script>
+</body>
+</html>

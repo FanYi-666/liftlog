@@ -1,0 +1,66 @@
+<view class="container">
+  <view class="eyebrow">NUTRITION</view>
+  <view class="title">每日饮食热量</view>
+  <view class="muted page-note">这里记录每天吃进去的热量，与训练动作记录完全分开。</view>
+
+  <view class="card summary-card">
+    <view>
+      <view class="muted">{{date}} 摄入</view>
+      <view class="big-number">{{dayTotal}}<text> kcal</text></view>
+    </view>
+    <view class="summary-side">
+      <view>目标 {{goal}}</view>
+      <view class="accent">{{status}} {{remaining}} kcal</view>
+    </view>
+  </view>
+
+  <view class="card form-card">
+    <view class="two-fields">
+      <view>
+        <view class="label">日期</view>
+        <picker mode="date" value="{{date}}" bindchange="changeDate">
+          <view class="picker">{{date}}</view>
+        </picker>
+      </view>
+      <view>
+        <view class="label">餐次</view>
+        <picker mode="selector" range="{{meals}}" value="{{mealIndex}}" bindchange="changeMeal">
+          <view class="picker">{{meals[mealIndex]}}</view>
+        </picker>
+      </view>
+    </view>
+
+    <view class="label top-gap">食物 / 餐食</view>
+    <input class="input" value="{{foodName}}" bindinput="setFoodName" placeholder="例如：鸡胸饭、牛奶、香蕉" />
+
+    <view class="label top-gap">热量（kcal）</view>
+    <input class="input" type="number" value="{{calories}}" bindinput="setCalories" placeholder="例如 520" />
+    <button class="primary save-food" bindtap="saveFood">＋ 记入当天</button>
+  </view>
+
+  <view class="section-title">当天明细</view>
+  <view wx:if="{{entries.length}}">
+    <view class="card entry-row" wx:for="{{entries}}" wx:key="id">
+      <view>
+        <view class="entry-name">{{item.name}}</view>
+        <view class="muted">{{item.meal}}</view>
+      </view>
+      <view class="entry-actions">
+        <view class="entry-calories">{{item.calories}} kcal</view>
+        <button class="delete-btn" data-id="{{item.id}}" bindtap="deleteFood">删除</button>
+      </view>
+    </view>
+  </view>
+  <view class="empty" wx:else>这一天还没有饮食记录。</view>
+
+  <view class="section-title">最近 7 天摄入</view>
+  <view class="card day-list">
+    <view class="day-row" wx:for="{{recentDays}}" wx:key="date">
+      <view>{{item.label}}</view>
+      <view class="day-right">
+        <text>{{item.total}} kcal</text>
+        <text class="muted">{{item.diffLabel}}</text>
+      </view>
+    </view>
+  </view>
+</view>

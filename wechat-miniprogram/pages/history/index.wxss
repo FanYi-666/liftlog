@@ -1,0 +1,8 @@
+.page-note { margin-top:-18rpx; }
+.day-head { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:20rpx; }
+.day-title { font-size:32rpx; font-weight:800; margin-bottom:8rpx; }
+.accent { font-size:24rpx; font-weight:800; }
+.record-row { display:flex; justify-content:space-between; align-items:center; background:#1c2025; border:1rpx solid #2a3037; border-radius:22rpx; padding:20rpx; margin-top:12rpx; }
+.record-name { font-weight:700; margin-bottom:6rpx; }
+.record-meta { color:#8f99a4; font-size:21rpx; text-align:right; line-height:1.5; }
+.totals { border-top:1rpx solid #2a3037; color:#8f99a4; font-size:22rpx; padding-top:18rpx; margin-top:20rpx; }

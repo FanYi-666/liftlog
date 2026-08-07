@@ -1,0 +1,67 @@
+<view class="container">
+  <view class="eyebrow">EXERCISE TREND</view>
+  <view class="title">看清动作变化</view>
+
+  <view class="row controls">
+    <view class="field grow">
+      <view class="label">动作</view>
+      <picker mode="selector" range="{{exerciseNames}}" value="{{exerciseIndex}}" bindchange="changeExercise">
+        <view class="picker">{{exerciseNames[exerciseIndex] || '请选择动作'}}</view>
+      </picker>
+    </view>
+    <view class="field range-field">
+      <view class="label">阶段</view>
+      <picker mode="selector" range="{{rangeLabels}}" value="{{rangeIndex}}" bindchange="changeRange">
+        <view class="picker">{{rangeLabels[rangeIndex]}}</view>
+      </picker>
+    </view>
+  </view>
+
+  <view class="metric-tabs">
+    <button
+      wx:for="{{metricOptions}}"
+      wx:key="key"
+      data-index="{{index}}"
+      bindtap="changeMetric"
+      class="metric-tab {{metricIndex === index ? 'active' : ''}}"
+    >{{item.label}}</button>
+  </view>
+
+  <view class="summary-grid">
+    <view class="card summary-card"><view class="muted">总组数</view><view class="metric-small">{{summary.sets}}</view></view>
+    <view class="card summary-card"><view class="muted">总次数</view><view class="metric-small">{{summary.reps}}</view></view>
+    <view class="card summary-card"><view class="muted">总容量</view><view class="metric-small">{{summary.volume}} kg</view></view>
+    <view class="card summary-card"><view class="muted">阶段最高重量</view><view class="metric-small">{{summary.maxWeight}} kg</view></view>
+  </view>
+
+  <view class="section-title">每日{{metricLabel}}</view>
+  <view class="card trend-card">
+    <scroll-view scroll-y class="trend-scroll">
+      <view class="trend-row" wx:for="{{trend}}" wx:key="date">
+        <view class="trend-date">{{item.label}}</view>
+        <view class="trend-track"><view class="trend-bar" style="width: {{item.width}}%"></view></view>
+        <view class="trend-value">{{item.displayValue}}</view>
+      </view>
+    </scroll-view>
+  </view>
+
+  <view class="section-title">每天每组明细</view>
+  <view wx:if="{{history.length}}">
+    <view class="card day-card" wx:for="{{history}}" wx:key="date">
+      <view class="day-head">
+        <view>
+          <view class="day-date">{{item.dateLabel}}</view>
+          <view class="muted">{{item.setCount}} 组训练 · 最高 {{item.maxWeight}} kg</view>
+        </view>
+        <view class="accent total-volume">{{item.volume}} kg</view>
+      </view>
+      <view class="chips">
+        <view class="chip" wx:for="{{item.sets}}" wx:for-item="set" wx:for-index="setIndex">
+          {{setIndex + 1}}. {{set.weight}}kg × {{set.reps}}
+        </view>
+      </view>
+      <view class="day-total">合计 {{item.setCount}} 组 · {{item.reps}} 次 · {{item.volume}} kg · 最高 {{item.maxWeight}} kg</view>
+    </view>
+  </view>
+  <view class="empty" wx:else>这个阶段还没有该动作的记录。</view>
+</view>

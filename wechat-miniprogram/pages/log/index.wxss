@@ -1,0 +1,10 @@
+.page-note { margin-top:-18rpx; }
+.set-head { display:grid; grid-template-columns:56rpx 1fr 1fr 64rpx; gap:12rpx; color:#8f99a4; font-size:20rpx; text-align:center; margin:28rpx 0 12rpx; }
+.set-row { display:grid; grid-template-columns:56rpx 1fr 1fr 64rpx; gap:12rpx; align-items:center; margin-bottom:12rpx; }
+.set-index { width:52rpx; height:52rpx; border-radius:16rpx; background:#252b31; color:#8f99a4; display:flex; align-items:center; justify-content:center; font-size:22rpx; }
+.set-input { background:#1c2025; border:1rpx solid #2a3037; border-radius:18rpx; padding:18rpx 10rpx; text-align:center; }
+.remove { width:58rpx; min-width:58rpx; height:58rpx; padding:0; margin:0; color:#ff7f73; background:rgba(255,127,115,.1); border-radius:16rpx; line-height:58rpx; }
+.actions-row { display:grid; grid-template-columns:1fr 1fr; gap:12rpx; margin-top:20rpx; }
+.custom-row { display:grid; grid-template-columns:1fr 150rpx; gap:12rpx; align-items:center; }
+.add-exercise { margin:0; }
+.primary { margin-top:10rpx; }

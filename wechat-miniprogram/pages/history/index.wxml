@@ -1,0 +1,28 @@
+<view class="container">
+  <view class="eyebrow">TRAINING HISTORY</view>
+  <view class="title">历史训练</view>
+  <view class="muted page-note">这里只展示训练动作数据；饮食热量请到“饮食”页查看。</view>
+
+  <view wx:if="{{days.length}}">
+    <view class="card day-card" wx:for="{{days}}" wx:key="date">
+      <view class="day-head">
+        <view>
+          <view class="day-title">{{item.dateLabel}}</view>
+          <view class="muted">{{item.records.length}} 个动作记录</view>
+        </view>
+        <view class="accent">{{item.total.volume}} kg</view>
+      </view>
+
+      <view class="record-row" wx:for="{{item.records}}" wx:for-item="record" wx:key="id">
+        <view>
+          <view class="record-name">{{record.name}}</view>
+          <view class="muted">{{record.sets}}组 · {{record.reps}}次</view>
+        </view>
+        <view class="record-meta">{{record.volume}} kg</view>
+      </view>
+
+      <view class="totals">全天 {{item.total.sets}} 组 · {{item.total.reps}} 次 · {{item.total.volume}} kg</view>
+    </view>
+  </view>
+  <view class="empty" wx:else>暂无历史训练。</view>
+</view>
