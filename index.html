@@ -10,7 +10,7 @@
   <meta name="mobile-web-app-capable" content="yes" />
   <title>LiftLog · 健身与饮食记录</title>
   <link rel="manifest" href="manifest.webmanifest" />
-  <link rel="stylesheet" href="styles.css?v=14" />
+  <link rel="stylesheet" href="styles.css?v=15" />
 </head>
 <body>
   <div class="app-shell">
@@ -114,7 +114,28 @@
             <div class="nutrition-progress-bar" id="foodProgressBar"></div>
           </div>
           <div class="nutrition-progress-meta"><span id="foodProgressMeta">0%</span><span>每日摄入进度</span></div>
+          <div class="macro-summary-grid">
+            <article><span>蛋白质</span><strong id="foodProteinTotal">0 / 140 g</strong><i><b id="foodProteinBar"></b></i></article>
+            <article><span>碳水</span><strong id="foodCarbsTotal">0 / 250 g</strong><i><b id="foodCarbsBar"></b></i></article>
+            <article><span>脂肪</span><strong id="foodFatTotal">0 / 70 g</strong><i><b id="foodFatBar"></b></i></article>
+          </div>
         </div>
+
+        <div class="nutrition-quick-actions">
+          <button class="secondary-button" id="copyPreviousDayFoodButton" type="button">复制前一天</button>
+          <button class="secondary-button" id="saveMealPresetButton" type="button">保存当前餐为常用餐</button>
+        </div>
+
+        <section class="nutrition-shortcuts-grid">
+          <article class="nutrition-shortcut-card">
+            <div class="food-quick-head"><div><p class="eyebrow">FREQUENT</p><h3>常用食物</h3></div><span class="muted">按使用频率自动排序</span></div>
+            <div id="frequentFoods" class="shortcut-chip-list"></div>
+          </article>
+          <article class="nutrition-shortcut-card">
+            <div class="food-quick-head"><div><p class="eyebrow">MEALS</p><h3>常用餐</h3></div><span class="muted">一键加入整餐</span></div>
+            <div id="mealPresets" class="shortcut-chip-list"></div>
+          </article>
+        </section>
 
         <div class="food-quick-card">
           <div class="food-quick-head">
@@ -143,8 +164,13 @@
             </div>
             <div class="field-group food-field calorie-field">
               <label for="foodCalories">热量</label>
-              <div class="calorie-input-wrap"><input id="foodCalories" type="number" min="1" inputmode="numeric" placeholder="520" /><span>kcal</span></div>
+              <div class="calorie-input-wrap"><input id="foodCalories" type="number" min="0" inputmode="numeric" placeholder="520" /><span>kcal</span></div>
             </div>
+          </div>
+          <div class="macro-entry-grid">
+            <div class="field-group"><label for="foodProtein">蛋白质</label><div class="macro-input-wrap"><input id="foodProtein" type="number" min="0" step="0.1" inputmode="decimal" placeholder="35" /><span>g</span></div></div>
+            <div class="field-group"><label for="foodCarbs">碳水</label><div class="macro-input-wrap"><input id="foodCarbs" type="number" min="0" step="0.1" inputmode="decimal" placeholder="60" /><span>g</span></div></div>
+            <div class="field-group"><label for="foodFat">脂肪</label><div class="macro-input-wrap"><input id="foodFat" type="number" min="0" step="0.1" inputmode="decimal" placeholder="15" /><span>g</span></div></div>
           </div>
           <div class="form-actions food-form-actions">
             <button class="secondary-button cancel-edit hidden" id="cancelFoodEditButton" type="button">取消编辑</button>
@@ -170,6 +196,33 @@
             </div>
           </div>
           <div id="foodWeek" class="history-list"></div>
+        </section>
+
+        <section class="section-block nutrition-trend-section">
+          <div class="section-heading nutrition-trend-heading">
+            <div><p class="eyebrow">NUTRITION TREND</p><h2>营养趋势</h2></div>
+            <div class="nutrition-range-switch"><button class="active" type="button" data-nutrition-range="7">7 天</button><button type="button" data-nutrition-range="30">30 天</button></div>
+          </div>
+          <div class="nutrition-trend-summary" id="nutritionTrendSummary"></div>
+          <div id="nutritionTrendChart" class="nutrition-trend-chart"></div>
+        </section>
+
+        <section class="section-block body-section">
+          <div class="section-heading">
+            <div><p class="eyebrow">BODY</p><h2>身体记录</h2></div>
+            <span class="muted">体重和体脂独立于训练</span>
+          </div>
+          <div class="body-entry-card">
+            <div class="body-entry-grid">
+              <div class="field-group"><label for="bodyDate">日期</label><input id="bodyDate" type="date" /></div>
+              <div class="field-group"><label for="bodyWeight">体重</label><div class="macro-input-wrap"><input id="bodyWeight" type="number" min="20" max="400" step="0.1" inputmode="decimal" placeholder="70.0" /><span>kg</span></div></div>
+              <div class="field-group"><label for="bodyFat">体脂（可选）</label><div class="macro-input-wrap"><input id="bodyFat" type="number" min="1" max="70" step="0.1" inputmode="decimal" placeholder="15.0" /><span>%</span></div></div>
+            </div>
+            <button class="secondary-button" id="saveBodyRecordButton" type="button">保存身体记录</button>
+          </div>
+          <div class="body-summary-grid" id="bodySummaryGrid"></div>
+          <div id="bodyNutritionChart" class="body-nutrition-chart"></div>
+          <div id="bodyRecordList" class="body-record-list"></div>
         </section>
       </section>
 
@@ -783,11 +836,16 @@
         <label for="calorieGoalInput">每日摄入目标（kcal）</label>
         <input id="calorieGoalInput" type="number" min="800" max="6000" step="10" required />
       </div>
+      <div class="settings-macro-grid">
+        <div class="field-group"><label for="proteinGoalInput">蛋白质目标（g）</label><input id="proteinGoalInput" type="number" min="0" max="500" step="1" /></div>
+        <div class="field-group"><label for="carbsGoalInput">碳水目标（g）</label><input id="carbsGoalInput" type="number" min="0" max="1000" step="1" /></div>
+        <div class="field-group"><label for="fatGoalInput">脂肪目标（g）</label><input id="fatGoalInput" type="number" min="0" max="400" step="1" /></div>
+      </div>
       <div class="field-group">
         <label for="restSecondsInput">默认组间休息（秒）</label>
         <input id="restSecondsInput" type="number" min="15" max="600" step="15" required />
       </div>
-      <p class="helper-text">饮食目标只用于每日摄入对比。休息计时会在你勾选“完成一组”后自动启动。</p>
+      <p class="helper-text">热量和宏量营养目标只用于饮食对比，不会和训练消耗热量混算。休息计时仍独立用于训练。</p>
       <button class="primary-button" value="default">保存设置</button>
       <div class="settings-divider"></div>
       <div>
@@ -816,6 +874,6 @@
   </div>
 
   <div id="toast" class="toast" role="status"></div>
-  <script src="app.js?v=14"></script>
+  <script src="app.js?v=15"></script>
 </body>
 </html>

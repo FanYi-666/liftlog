@@ -1,10 +1,13 @@
 const STORAGE_KEY = "liftlog-v1";
-const SCHEMA_VERSION = 10;
+const SCHEMA_VERSION = 11;
 
 const defaultState = {
   schemaVersion: SCHEMA_VERSION,
   settings: {
     calorieGoal: 2200,
+    proteinGoal: 140,
+    carbsGoal: 250,
+    fatGoal: 70,
     restSeconds: 120,
   },
   exercises: [
@@ -20,6 +23,8 @@ const defaultState = {
   ],
   records: [],
   foodRecords: [],
+  bodyRecords: [],
+  mealPresets: [],
   templates: [],
   weeklyPlan: Array.from({ length: 7 }, (_, dayIndex) => ({ dayIndex, isTrainingDay: false, templateId: "", reminderTime: "" })),
   trainingProfile: {
@@ -39,7 +44,7 @@ const ANALYTICS_METRICS = {
   reps: { label: "总次数", unit: "次", badge: "每日完成次数" },
 };
 
-let state = loadState();
+let state;
 const newDraftSet = (source = {}) => ({
   weight: source.weight ?? "",
   reps: source.reps ?? "",
@@ -65,6 +70,8 @@ let calendarMonthOffset = 0;
 let creatorDraftTemplate = null;
 let pendingFeedbackRecordId = null;
 let adaptivePlanDraft = [];
+let nutritionRangeDays = 7;
+let editingBodyDate = null;
 
 const $ = (selector) => document.querySelector(selector);
 const $$ = (selector) => [...document.querySelectorAll(selector)];
@@ -169,6 +176,56 @@ function normalizePlanOverrides(overrides) {
     }));
 }
 
+function normalizeFoodRecords(records) {
+  if (!Array.isArray(records)) return [];
+  return records.map((record) => ({
+    ...record,
+    id: record.id || (crypto.randomUUID?.() || `food-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`),
+    date: /^\d{4}-\d{2}-\d{2}$/.test(String(record.date || "")) ? String(record.date) : localDateISO(),
+    meal: ["早餐", "午餐", "晚餐", "加餐"].includes(record.meal) ? record.meal : "加餐",
+    name: String(record.name || record.meal || "饮食"),
+    calories: Math.max(0, Math.round(Number(record.calories) || 0)),
+    protein: Math.max(0, Number(record.protein) || 0),
+    carbs: Math.max(0, Number(record.carbs) || 0),
+    fat: Math.max(0, Number(record.fat) || 0),
+    createdAt: record.createdAt || new Date().toISOString(),
+    updatedAt: record.updatedAt,
+  })).filter((record) => record.calories > 0 || record.protein > 0 || record.carbs > 0 || record.fat > 0);
+}
+
+function normalizeBodyRecords(records) {
+  if (!Array.isArray(records)) return [];
+  const byDate = new Map();
+  records.forEach((record) => {
+    const date = String(record?.date || "");
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return;
+    const weight = Number(record.weight) > 0 ? Number(record.weight) : null;
+    const bodyFat = Number(record.bodyFat) > 0 ? Number(record.bodyFat) : null;
+    if (!weight && !bodyFat) return;
+    byDate.set(date, {
+      date,
+      weight,
+      bodyFat,
+      createdAt: record.createdAt || new Date().toISOString(),
+      updatedAt: record.updatedAt,
+    });
+  });
+  return [...byDate.values()].sort((a, b) => a.date.localeCompare(b.date));
+}
+
+function normalizeMealPresets(presets) {
+  if (!Array.isArray(presets)) return [];
+  return presets.map((preset) => ({
+    id: preset.id || (crypto.randomUUID?.() || `meal-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`),
+    name: String(preset.name || "常用餐"),
+    meal: ["早餐", "午餐", "晚餐", "加餐"].includes(preset.meal) ? preset.meal : "加餐",
+    items: normalizeFoodRecords((preset.items || []).map((item) => ({ ...item, date: localDateISO() }))).map(({ name, calories, protein, carbs, fat }) => ({ name, calories, protein, carbs, fat })),
+    createdAt: preset.createdAt || new Date().toISOString(),
+    useCount: Math.max(0, Number(preset.useCount) || 0),
+    lastUsedAt: preset.lastUsedAt || "",
+  })).filter((preset) => preset.items.length);
+}
+
 function normalizeTemplates(templates) {
   if (!Array.isArray(templates)) return [];
   return templates.map((template) => ({
@@ -195,6 +252,9 @@ function loadState() {
 
     const oldGoal = Number(saved.settings?.calorieGoal);
     const calorieGoal = oldGoal >= 800 ? oldGoal : defaultState.settings.calorieGoal;
+    const proteinGoal = Math.max(0, Number(saved.settings?.proteinGoal) || defaultState.settings.proteinGoal);
+    const carbsGoal = Math.max(0, Number(saved.settings?.carbsGoal) || defaultState.settings.carbsGoal);
+    const fatGoal = Math.max(0, Number(saved.settings?.fatGoal) || defaultState.settings.fatGoal);
     const restSeconds = Math.min(600, Math.max(15, Number(saved.settings?.restSeconds) || defaultState.settings.restSeconds));
     const records = Array.isArray(saved.records)
       ? saved.records.map((record) => ({
@@ -219,10 +279,12 @@ function loadState() {
 
     return {
       schemaVersion: SCHEMA_VERSION,
-      settings: { calorieGoal, restSeconds },
+      settings: { calorieGoal, proteinGoal, carbsGoal, fatGoal, restSeconds },
       exercises: normalizeExercises(saved.exercises),
       records,
-      foodRecords: Array.isArray(saved.foodRecords) ? saved.foodRecords : [],
+      foodRecords: normalizeFoodRecords(saved.foodRecords),
+      bodyRecords: normalizeBodyRecords(saved.bodyRecords),
+      mealPresets: normalizeMealPresets(saved.mealPresets),
       templates: normalizeTemplates(saved.templates),
       weeklyPlan: normalizeWeeklyPlan(saved.weeklyPlan),
       trainingProfile: normalizeTrainingProfile(saved.trainingProfile),
@@ -232,6 +294,8 @@ function loadState() {
     return clone(defaultState);
   }
 }
+
+state = loadState();
 
 function saveState() {
   state.schemaVersion = SCHEMA_VERSION;
@@ -348,6 +412,25 @@ function metricValueForRecords(records, metricKey) {
 
 function sumFoodCalories(records) {
   return (records || []).reduce((sum, record) => sum + (Number(record.calories) || 0), 0);
+}
+
+function foodMacroTotals(records) {
+  return (records || []).reduce((totals, record) => {
+    totals.calories += Number(record.calories) || 0;
+    totals.protein += Number(record.protein) || 0;
+    totals.carbs += Number(record.carbs) || 0;
+    totals.fat += Number(record.fat) || 0;
+    return totals;
+  }, { calories: 0, protein: 0, carbs: 0, fat: 0 });
+}
+
+function foodRecordsForDate(date) {
+  return state.foodRecords.filter((record) => record.date === date);
+}
+
+function nutritionRecordsForDays(days) {
+  const start = daysAgoISO(Math.max(0, days - 1));
+  return state.foodRecords.filter((record) => record.date >= start && record.date <= localDateISO());
 }
 
 function estimated1rm(weight, reps) {
@@ -2052,6 +2135,243 @@ function renderRecentExercises() {
   });
 }
 
+function frequentFoodStats() {
+  const map = new Map();
+  state.foodRecords.forEach((record) => {
+    const key = String(record.name || "").trim().toLowerCase();
+    if (!key) return;
+    const current = map.get(key) || { name: record.name, count: 0, latest: "", record };
+    current.count += 1;
+    const stamp = record.updatedAt || record.createdAt || record.date || "";
+    if (stamp >= current.latest) {
+      current.latest = stamp;
+      current.name = record.name;
+      current.record = record;
+    }
+    map.set(key, current);
+  });
+  return [...map.values()].sort((a, b) => b.count - a.count || String(b.latest).localeCompare(String(a.latest))).slice(0, 8);
+}
+
+function fillFoodDraftFromRecord(record) {
+  if (!record) return;
+  $("#foodName").value = record.name || "";
+  $("#foodCalories").value = Number(record.calories) || "";
+  $("#foodProtein").value = Number(record.protein) || "";
+  $("#foodCarbs").value = Number(record.carbs) || "";
+  $("#foodFat").value = Number(record.fat) || "";
+}
+
+function renderNutritionShortcuts() {
+  const frequentRoot = $("#frequentFoods");
+  const mealRoot = $("#mealPresets");
+  if (frequentRoot) {
+    const foods = frequentFoodStats();
+    frequentRoot.innerHTML = foods.length
+      ? foods.map((item, index) => `<button type="button" data-frequent-food="${index}"><strong>${item.name}</strong><small>${formatNumber(item.record.calories)} kcal · P${formatNumber(item.record.protein, 1)} C${formatNumber(item.record.carbs, 1)} F${formatNumber(item.record.fat, 1)}</small></button>`).join("")
+      : '<div class="empty-state compact-empty">记录几次饮食后，这里会自动出现常用食物。</div>';
+  }
+  if (mealRoot) {
+    const presets = state.mealPresets.slice().sort((a, b) => (b.useCount || 0) - (a.useCount || 0) || String(b.lastUsedAt || b.createdAt).localeCompare(String(a.lastUsedAt || a.createdAt)));
+    mealRoot.innerHTML = presets.length
+      ? presets.map((preset) => {
+          const totals = foodMacroTotals(preset.items);
+          return `<span class="meal-preset-chip"><button type="button" data-meal-preset="${preset.id}"><strong>${preset.name}</strong><small>${preset.items.length} 项 · ${formatNumber(totals.calories)} kcal</small></button><button class="preset-delete" type="button" data-meal-preset-delete="${preset.id}" aria-label="删除${preset.name}">×</button></span>`;
+        }).join("")
+      : '<div class="empty-state compact-empty">把当天某一餐保存后，可以一键重复整餐。</div>';
+  }
+}
+
+function saveCurrentMealPreset() {
+  const date = $("#foodDate").value || localDateISO();
+  const meal = $("#mealSelect").value || "加餐";
+  const items = state.foodRecords.filter((record) => record.date === date && record.meal === meal);
+  if (!items.length) return showToast("当前餐次还没有可保存的食物");
+  const name = window.prompt("给这份常用餐起个名字", `${meal} · ${formatDate(date)}`)?.trim();
+  if (!name) return;
+  state.mealPresets.push({
+    id: crypto.randomUUID?.() || `meal-${Date.now()}`,
+    name,
+    meal,
+    items: items.map(({ name: itemName, calories, protein, carbs, fat }) => ({ name: itemName, calories, protein, carbs, fat })),
+    createdAt: new Date().toISOString(),
+    useCount: 0,
+    lastUsedAt: "",
+  });
+  saveState();
+  renderNutritionShortcuts();
+  showToast("已保存为常用餐");
+}
+
+function addMealPresetToDay(presetId) {
+  const preset = state.mealPresets.find((item) => item.id === presetId);
+  if (!preset) return;
+  const date = $("#foodDate").value || localDateISO();
+  const now = new Date().toISOString();
+  preset.items.forEach((item, index) => {
+    state.foodRecords.push({
+      id: crypto.randomUUID?.() || `food-${Date.now()}-${index}`,
+      date,
+      meal: preset.meal,
+      name: item.name,
+      calories: Number(item.calories) || 0,
+      protein: Number(item.protein) || 0,
+      carbs: Number(item.carbs) || 0,
+      fat: Number(item.fat) || 0,
+      createdAt: now,
+    });
+  });
+  preset.useCount = (Number(preset.useCount) || 0) + 1;
+  preset.lastUsedAt = now;
+  saveState();
+  renderCalories();
+  renderDashboard();
+  showToast(`已加入常用餐：${preset.name}`);
+}
+
+function copyPreviousDayFood() {
+  const target = dateFromISO($("#foodDate").value || localDateISO());
+  const sourceDate = localDateISO(addDays(target, -1));
+  const targetDate = localDateISO(target);
+  const source = state.foodRecords.filter((record) => record.date === sourceDate);
+  if (!source.length) return showToast("前一天没有饮食记录");
+  const targetHasFood = state.foodRecords.some((record) => record.date === targetDate);
+  if (targetHasFood && !window.confirm("当天已经有饮食记录，继续会追加复制。确定继续吗？")) return;
+  const now = new Date().toISOString();
+  source.forEach((record, index) => state.foodRecords.push({
+    ...record,
+    id: crypto.randomUUID?.() || `food-${Date.now()}-${index}`,
+    date: targetDate,
+    createdAt: now,
+    updatedAt: undefined,
+  }));
+  saveState();
+  renderCalories();
+  renderDashboard();
+  showToast(`已复制 ${source.length} 条前一天饮食`);
+}
+
+function nutritionDailySeries(days) {
+  return Array.from({ length: days }, (_, index) => {
+    const date = daysAgoISO(days - 1 - index);
+    return { date, ...foodMacroTotals(foodRecordsForDate(date)) };
+  });
+}
+
+function renderNutritionTrend() {
+  const root = $("#nutritionTrendChart");
+  const summary = $("#nutritionTrendSummary");
+  if (!root || !summary) return;
+  const series = nutritionDailySeries(nutritionRangeDays);
+  const logged = series.filter((day) => day.calories > 0);
+  const divisor = Math.max(1, logged.length);
+  const totals = logged.reduce((acc, day) => {
+    acc.calories += day.calories; acc.protein += day.protein; acc.carbs += day.carbs; acc.fat += day.fat; return acc;
+  }, { calories: 0, protein: 0, carbs: 0, fat: 0 });
+  summary.innerHTML = `
+    <article><span>有记录</span><strong>${logged.length}</strong><small>天</small></article>
+    <article><span>平均热量</span><strong>${formatNumber(totals.calories / divisor)}</strong><small>kcal</small></article>
+    <article><span>平均蛋白</span><strong>${formatNumber(totals.protein / divisor, 1)}</strong><small>g</small></article>
+    <article><span>平均碳水 / 脂肪</span><strong>${formatNumber(totals.carbs / divisor, 1)} / ${formatNumber(totals.fat / divisor, 1)}</strong><small>g</small></article>`;
+
+  const width = 680;
+  const height = 210;
+  const padX = 28;
+  const padTop = 18;
+  const padBottom = 28;
+  const plotH = height - padTop - padBottom;
+  const maxCalories = Math.max(Number(state.settings.calorieGoal) || 1, ...series.map((d) => d.calories), 1);
+  const maxProtein = Math.max(Number(state.settings.proteinGoal) || 1, ...series.map((d) => d.protein), 1);
+  const step = (width - padX * 2) / Math.max(1, series.length);
+  const proteinPoints = series.map((day, index) => {
+    const x = padX + step * index + step / 2;
+    const y = padTop + plotH * (1 - day.protein / maxProtein);
+    return `${x},${y}`;
+  }).join(" ");
+  root.innerHTML = `<svg viewBox="0 0 ${width} ${height}" role="img" aria-label="${nutritionRangeDays}天热量和蛋白质趋势">
+    <line x1="${padX}" y1="${padTop + plotH}" x2="${width - padX}" y2="${padTop + plotH}" class="nutrition-axis" />
+    ${series.map((day, index) => {
+      const barH = Math.max(0, plotH * day.calories / maxCalories);
+      const x = padX + step * index + step * 0.14;
+      const barW = Math.max(2, step * 0.72);
+      return `<rect x="${x}" y="${padTop + plotH - barH}" width="${barW}" height="${barH}" rx="3" class="nutrition-calorie-bar" />`;
+    }).join("")}
+    <polyline points="${proteinPoints}" class="nutrition-protein-line" />
+    ${series.map((day, index) => {
+      if (nutritionRangeDays > 7 && index % 5 !== 0 && index !== series.length - 1) return "";
+      const x = padX + step * index + step / 2;
+      return `<text x="${x}" y="${height - 8}" text-anchor="middle" class="nutrition-chart-label">${day.date.slice(5).replace("-", "/")}</text>`;
+    }).join("")}
+  </svg><div class="nutrition-chart-legend"><span><i class="calorie-legend"></i>热量</span><span><i class="protein-legend"></i>蛋白质</span></div>`;
+}
+
+function saveBodyRecord() {
+  const date = $("#bodyDate").value || localDateISO();
+  const weight = Number($("#bodyWeight").value) > 0 ? Number($("#bodyWeight").value) : null;
+  const bodyFat = Number($("#bodyFat").value) > 0 ? Number($("#bodyFat").value) : null;
+  if (!weight && !bodyFat) return showToast("至少填写体重或体脂一项");
+  const existing = state.bodyRecords.find((record) => record.date === date);
+  if (existing) Object.assign(existing, { weight, bodyFat, updatedAt: new Date().toISOString() });
+  else state.bodyRecords.push({ date, weight, bodyFat, createdAt: new Date().toISOString() });
+  state.bodyRecords = normalizeBodyRecords(state.bodyRecords);
+  editingBodyDate = null;
+  saveState();
+  $("#saveBodyRecordButton").textContent = "保存身体记录";
+  renderBodyTracking();
+  showToast(existing ? "身体记录已更新" : "身体记录已保存");
+}
+
+function renderBodyTracking() {
+  const summary = $("#bodySummaryGrid");
+  const list = $("#bodyRecordList");
+  const chart = $("#bodyNutritionChart");
+  if (!summary || !list || !chart) return;
+  const sorted = state.bodyRecords.slice().sort((a, b) => b.date.localeCompare(a.date));
+  const latestWeight = sorted.find((record) => Number(record.weight) > 0);
+  const latestFat = sorted.find((record) => Number(record.bodyFat) > 0);
+  const thirtyStart = daysAgoISO(29);
+  const weight30 = state.bodyRecords.filter((record) => record.date >= thirtyStart && Number(record.weight) > 0).sort((a, b) => a.date.localeCompare(b.date));
+  const weightDelta = weight30.length >= 2 ? Number(weight30.at(-1).weight) - Number(weight30[0].weight) : null;
+  const recent7 = state.bodyRecords.filter((record) => record.date >= daysAgoISO(6) && Number(record.weight) > 0);
+  const avg7 = recent7.length ? recent7.reduce((sum, record) => sum + Number(record.weight), 0) / recent7.length : null;
+  summary.innerHTML = `
+    <article><span>最新体重</span><strong>${latestWeight ? formatNumber(latestWeight.weight, 1) : "—"}</strong><small>${latestWeight ? "kg" : "暂无"}</small></article>
+    <article><span>7天平均</span><strong>${avg7 != null ? formatNumber(avg7, 1) : "—"}</strong><small>${avg7 != null ? "kg" : "暂无"}</small></article>
+    <article><span>30天变化</span><strong>${weightDelta == null ? "—" : `${weightDelta > 0 ? "+" : ""}${formatNumber(weightDelta, 1)}`}</strong><small>${weightDelta == null ? "暂无" : "kg"}</small></article>
+    <article><span>最新体脂</span><strong>${latestFat ? formatNumber(latestFat.bodyFat, 1) : "—"}</strong><small>${latestFat ? "%" : "暂无"}</small></article>`;
+
+  const days = 30;
+  const series = Array.from({ length: days }, (_, index) => {
+    const date = daysAgoISO(days - 1 - index);
+    const body = state.bodyRecords.find((record) => record.date === date);
+    return { date, weight: Number(body?.weight) || null, calories: sumFoodCalories(foodRecordsForDate(date)) };
+  });
+  const weights = series.map((d) => d.weight).filter(Boolean);
+  const maxCal = Math.max(Number(state.settings.calorieGoal) || 1, ...series.map((d) => d.calories), 1);
+  if (!weights.length && !series.some((d) => d.calories)) {
+    chart.innerHTML = '<div class="empty-state">记录体重和饮食后，这里会把两条趋势放在同一时间轴上。</div>';
+  } else {
+    const width = 680, height = 220, px = 28, top = 18, bottom = 28, plotH = height - top - bottom;
+    const minW = weights.length ? Math.min(...weights) - 0.5 : 0;
+    const maxW = weights.length ? Math.max(...weights) + 0.5 : 1;
+    const step = (width - px * 2) / days;
+    const weightPoints = series.map((day, index) => {
+      if (!day.weight) return null;
+      const x = px + step * index + step / 2;
+      const y = top + plotH * (1 - (day.weight - minW) / Math.max(0.1, maxW - minW));
+      return `${x},${y}`;
+    }).filter(Boolean).join(" ");
+    chart.innerHTML = `<div class="body-chart-title"><strong>30天体重 × 热量</strong><span>用于观察同一阶段趋势，不推断因果</span></div><svg viewBox="0 0 ${width} ${height}">
+      ${series.map((day, index) => { const h = plotH * day.calories / maxCal; return `<rect x="${px + step * index + step * .12}" y="${top + plotH - h}" width="${Math.max(2, step * .76)}" height="${h}" rx="2" class="body-calorie-bar" />`; }).join("")}
+      ${weightPoints ? `<polyline points="${weightPoints}" class="body-weight-line" />` : ""}
+      ${series.map((day, index) => index % 5 === 0 || index === 29 ? `<text x="${px + step * index + step / 2}" y="${height - 8}" text-anchor="middle" class="nutrition-chart-label">${day.date.slice(5).replace("-", "/")}</text>` : "").join("")}
+    </svg><div class="nutrition-chart-legend"><span><i class="body-weight-legend"></i>体重</span><span><i class="calorie-legend"></i>热量</span></div>`;
+  }
+  list.innerHTML = sorted.length
+    ? sorted.slice(0, 12).map((record) => `<article class="body-record-row"><div><strong>${formatDate(record.date, true)}</strong><small>${record.weight ? `${formatNumber(record.weight, 1)} kg` : "未记体重"}${record.bodyFat ? ` · 体脂 ${formatNumber(record.bodyFat, 1)}%` : ""}</small></div><div><button type="button" data-body-edit="${record.date}">编辑</button><button type="button" class="danger-action" data-body-delete="${record.date}">删除</button></div></article>`).join("")
+    : '<div class="empty-state">还没有身体记录。</div>';
+}
+
 function renderCalories() {
   const dateInput = $("#foodDate");
   if (!dateInput.value) dateInput.value = localDateISO();
@@ -2060,7 +2380,8 @@ function renderCalories() {
   const entries = state.foodRecords
     .filter((record) => record.date === date)
     .sort((a, b) => String(a.createdAt || "").localeCompare(String(b.createdAt || "")));
-  const total = sumFoodCalories(entries);
+  const totals = foodMacroTotals(entries);
+  const total = totals.calories;
   const delta = goal - total;
 
   $("#foodDateLabel").textContent = `${formatDate(date)} `;
@@ -2073,6 +2394,17 @@ function renderCalories() {
   $("#foodProgressBar").style.width = `${Math.min(100, Math.max(0, foodPercent))}%`;
   $("#foodProgressBar").classList.toggle("over", total > goal);
   $("#foodProgressMeta").textContent = `${foodPercent}%`;
+  const macroGoals = {
+    protein: Number(state.settings.proteinGoal) || 0,
+    carbs: Number(state.settings.carbsGoal) || 0,
+    fat: Number(state.settings.fatGoal) || 0,
+  };
+  [["Protein", "protein"], ["Carbs", "carbs"], ["Fat", "fat"]].forEach(([idPart, key]) => {
+    const value = totals[key];
+    const goalValue = macroGoals[key];
+    $("#food" + idPart + "Total").textContent = `${formatNumber(value, 1)} / ${formatNumber(goalValue)} g`;
+    $("#food" + idPart + "Bar").style.width = `${goalValue ? Math.min(100, value / goalValue * 100) : 0}%`;
+  });
   $$("[data-meal-quick]").forEach((button) => button.classList.toggle("active", button.dataset.mealQuick === $("#mealSelect").value));
 
   const root = $("#foodEntries");
@@ -2089,7 +2421,7 @@ function renderCalories() {
       const meal = document.createElement("p");
       meal.className = "muted";
       meal.style.marginTop = "5px";
-      meal.textContent = record.meal || "饮食";
+      meal.textContent = `${record.meal || "饮食"} · P ${formatNumber(record.protein, 1)}g · C ${formatNumber(record.carbs, 1)}g · F ${formatNumber(record.fat, 1)}g`;
       left.append(name, meal);
 
       const actions = document.createElement("div");
@@ -2125,6 +2457,9 @@ function renderCalories() {
     item.innerHTML = `<div><strong>${formatDate(day, i > 5)}</strong><div class="date">${diff >= 0 ? `剩余 ${formatNumber(diff)}` : `超出 ${formatNumber(Math.abs(diff))}`} kcal</div></div><div class="total">${formatNumber(dayTotal)} kcal</div>`;
     week.appendChild(item);
   }
+  renderNutritionShortcuts();
+  renderNutritionTrend();
+  renderBodyTracking();
 }
 
 function recordsForExerciseInRange(exerciseId, days) {
@@ -2779,6 +3114,9 @@ function resetFoodDraft() {
   editingFoodId = null;
   $("#foodName").value = "";
   $("#foodCalories").value = "";
+  $("#foodProtein").value = "";
+  $("#foodCarbs").value = "";
+  $("#foodFat").value = "";
   $("#saveFoodButton").textContent = "＋ 记入当天";
   $("#cancelFoodEditButton").classList.add("hidden");
 }
@@ -2789,8 +3127,7 @@ function startFoodEdit(recordId) {
   editingFoodId = record.id;
   $("#foodDate").value = record.date;
   $("#mealSelect").value = record.meal || "加餐";
-  $("#foodName").value = record.name || "";
-  $("#foodCalories").value = record.calories;
+  fillFoodDraftFromRecord(record);
   $("#saveFoodButton").textContent = "保存修改";
   $("#cancelFoodEditButton").classList.remove("hidden");
   renderCalories();
@@ -2800,6 +3137,9 @@ function saveFood() {
   const date = $("#foodDate").value || localDateISO();
   const meal = $("#mealSelect").value || "加餐";
   const calories = Math.round(Number($("#foodCalories").value) || 0);
+  const protein = Math.max(0, Number($("#foodProtein").value) || 0);
+  const carbs = Math.max(0, Number($("#foodCarbs").value) || 0);
+  const fat = Math.max(0, Number($("#foodFat").value) || 0);
   const name = $("#foodName").value.trim() || meal;
 
   if (calories <= 0) {
@@ -2809,7 +3149,7 @@ function saveFood() {
 
   if (editingFoodId) {
     const record = state.foodRecords.find((item) => item.id === editingFoodId);
-    if (record) Object.assign(record, { date, meal, name, calories, updatedAt: new Date().toISOString() });
+    if (record) Object.assign(record, { date, meal, name, calories, protein, carbs, fat, updatedAt: new Date().toISOString() });
   } else {
     state.foodRecords.push({
       id: crypto.randomUUID?.() || `food-${Date.now()}`,
@@ -2817,6 +3157,9 @@ function saveFood() {
       meal,
       name,
       calories,
+      protein,
+      carbs,
+      fat,
       createdAt: new Date().toISOString(),
     });
   }
@@ -2850,11 +3193,16 @@ async function importData(file) {
       schemaVersion: SCHEMA_VERSION,
       settings: {
         calorieGoal: Math.max(800, Number(data.settings?.calorieGoal) || 2200),
+        proteinGoal: Math.max(0, Number(data.settings?.proteinGoal) || 140),
+        carbsGoal: Math.max(0, Number(data.settings?.carbsGoal) || 250),
+        fatGoal: Math.max(0, Number(data.settings?.fatGoal) || 70),
         restSeconds: Math.min(600, Math.max(15, Number(data.settings?.restSeconds) || 120)),
       },
       exercises: normalizeExercises(data.exercises),
       records: data.records,
-      foodRecords: data.foodRecords,
+      foodRecords: normalizeFoodRecords(data.foodRecords),
+      bodyRecords: normalizeBodyRecords(data.bodyRecords),
+      mealPresets: normalizeMealPresets(data.mealPresets),
       templates: normalizeTemplates(data.templates),
       weeklyPlan: normalizeWeeklyPlan(data.weeklyPlan),
       trainingProfile: normalizeTrainingProfile(data.trainingProfile),
@@ -3154,6 +3502,29 @@ function bindEvents() {
     $("#foodName").focus();
   });
   $("#saveFoodButton").addEventListener("click", saveFood);
+  $("#copyPreviousDayFoodButton").addEventListener("click", copyPreviousDayFood);
+  $("#saveMealPresetButton").addEventListener("click", saveCurrentMealPreset);
+  $("#frequentFoods").addEventListener("click", (event) => {
+    const button = event.target.closest("[data-frequent-food]");
+    if (!button) return;
+    const item = frequentFoodStats()[Number(button.dataset.frequentFood)];
+    if (!item) return;
+    fillFoodDraftFromRecord(item.record);
+    $("#foodName").focus();
+  });
+  $("#mealPresets").addEventListener("click", (event) => {
+    const remove = event.target.closest("[data-meal-preset-delete]");
+    if (remove) {
+      const preset = state.mealPresets.find((item) => item.id === remove.dataset.mealPresetDelete);
+      if (!preset || !window.confirm(`删除常用餐“${preset.name}”吗？`)) return;
+      state.mealPresets = state.mealPresets.filter((item) => item.id !== preset.id);
+      saveState();
+      renderNutritionShortcuts();
+      return showToast("常用餐已删除");
+    }
+    const button = event.target.closest("[data-meal-preset]");
+    if (button) addMealPresetToDay(button.dataset.mealPreset);
+  });
   $("#foodEntries").addEventListener("click", (event) => {
     const edit = event.target.closest("[data-food-edit]");
     if (edit) return startFoodEdit(edit.dataset.foodEdit);
@@ -3178,6 +3549,31 @@ function bindEvents() {
     resetFoodDraft();
     renderCalories();
     window.scrollTo({ top: 0, behavior: "smooth" });
+  });
+  $$("[data-nutrition-range]").forEach((button) => button.addEventListener("click", () => {
+    nutritionRangeDays = Number(button.dataset.nutritionRange) === 30 ? 30 : 7;
+    $$("[data-nutrition-range]").forEach((item) => item.classList.toggle("active", item === button));
+    renderNutritionTrend();
+  }));
+  $("#saveBodyRecordButton").addEventListener("click", saveBodyRecord);
+  $("#bodyRecordList").addEventListener("click", (event) => {
+    const edit = event.target.closest("[data-body-edit]");
+    if (edit) {
+      const record = state.bodyRecords.find((item) => item.date === edit.dataset.bodyEdit);
+      if (!record) return;
+      editingBodyDate = record.date;
+      $("#bodyDate").value = record.date;
+      $("#bodyWeight").value = record.weight || "";
+      $("#bodyFat").value = record.bodyFat || "";
+      $("#saveBodyRecordButton").textContent = "更新身体记录";
+      return;
+    }
+    const remove = event.target.closest("[data-body-delete]");
+    if (!remove || !window.confirm("确定删除这天的身体记录吗？")) return;
+    state.bodyRecords = state.bodyRecords.filter((record) => record.date !== remove.dataset.bodyDelete);
+    saveState();
+    renderBodyTracking();
+    showToast("身体记录已删除");
   });
 
   $("#historyPageList").addEventListener("click", (event) => {
@@ -3272,6 +3668,9 @@ function bindEvents() {
 
   $("#settingsButton").addEventListener("click", () => {
     $("#calorieGoalInput").value = state.settings.calorieGoal;
+    $("#proteinGoalInput").value = state.settings.proteinGoal;
+    $("#carbsGoalInput").value = state.settings.carbsGoal;
+    $("#fatGoalInput").value = state.settings.fatGoal;
     $("#restSecondsInput").value = state.settings.restSeconds;
     $("#settingsDialog").showModal();
   });
@@ -3288,6 +3687,9 @@ function bindEvents() {
     if (submitterValue === "cancel") return;
     event.preventDefault();
     state.settings.calorieGoal = Math.max(800, Number($("#calorieGoalInput").value) || 2200);
+    state.settings.proteinGoal = Math.max(0, Number($("#proteinGoalInput").value) || 0);
+    state.settings.carbsGoal = Math.max(0, Number($("#carbsGoalInput").value) || 0);
+    state.settings.fatGoal = Math.max(0, Number($("#fatGoalInput").value) || 0);
     state.settings.restSeconds = Math.min(600, Math.max(15, Number($("#restSecondsInput").value) || 120));
     saveState();
     $("#settingsDialog").close();
@@ -3297,6 +3699,7 @@ function bindEvents() {
 }
 
 $("#foodDate").value = localDateISO();
+$("#bodyDate").value = localDateISO();
 $("#workoutDate").value = localDateISO();
 bindEvents();
 renderAll();

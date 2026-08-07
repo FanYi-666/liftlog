@@ -1,4 +1,4 @@
-const CACHE_NAME = 'liftlog-v11';
+const CACHE_NAME = 'liftlog-v12';
 const APP_SHELL = ['./', './index.html', './styles.css', './app.js', './manifest.webmanifest'];
 
 self.addEventListener('install', (event) => {
