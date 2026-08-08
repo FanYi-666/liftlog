@@ -1,5 +1,5 @@
 const STORAGE_KEY = "liftlog-v1";
-const SCHEMA_VERSION = 15;
+const SCHEMA_VERSION = 16;
 
 const defaultState = {
   schemaVersion: SCHEMA_VERSION,
@@ -64,6 +64,7 @@ const defaultState = {
     sessionMinutes: 60,
     equipment: ["barbell", "dumbbell", "machine", "bodyweight"],
     splitStyle: "recommended",
+    splitSystem: "upper_lower",
     dayTargets: [],
   },
   planOverrides: [],
@@ -112,6 +113,10 @@ function clone(value) {
   return JSON.parse(JSON.stringify(value));
 }
 
+function escapeHtml(value) {
+  return String(value ?? "").replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[char]));
+}
+
 function inferExerciseMode(name, mode) {
   if (mode === "bodyweight" || mode === "weighted") return mode;
   const text = String(name || "").toLowerCase().replace(/\s+/g, "");
@@ -150,12 +155,123 @@ const PLAN_TARGETS = {
   full: { label: "全身", muscles: ["胸", "背", "肩", "股四头", "后链", "臀", "核心"] },
 };
 const PLAN_TARGET_KEYS = Object.keys(PLAN_TARGETS);
+const SPLIT_SYSTEMS = {
+  full_body: {
+    label: "全身训练",
+    short: "全身",
+    description: "每次覆盖主要肌群，适合每周 2–3 练。",
+    recommendedDays: [2, 3],
+    sessions: [
+      { name: "全身 A", targets: ["full"] },
+      { name: "全身 B", targets: ["full"] },
+      { name: "全身 C", targets: ["full"] },
+    ],
+  },
+  upper_lower: {
+    label: "二分化 · 上肢 / 下肢",
+    short: "二分化",
+    description: "上肢与下肢交替，适合每周 4 练，恢复和覆盖比较均衡。",
+    recommendedDays: [4],
+    sessions: [
+      { name: "上肢 A", targets: ["upper"] },
+      { name: "下肢 A", targets: ["lower"] },
+      { name: "上肢 B", targets: ["upper"] },
+      { name: "下肢 B", targets: ["lower"] },
+    ],
+  },
+  ppl: {
+    label: "三分化 · 推 / 拉 / 腿",
+    short: "三分化",
+    description: "推、拉、腿形成完整循环，适合每周 3 或 6 练。",
+    recommendedDays: [3, 6],
+    sessions: [
+      { name: "推", targets: ["chest", "shoulders", "triceps"] },
+      { name: "拉", targets: ["back", "biceps"] },
+      { name: "腿", targets: ["legs", "posterior", "core"] },
+    ],
+  },
+  four_way: {
+    label: "四分化 · 胸 / 背 / 腿 / 肩臂",
+    short: "四分化",
+    description: "把大部位拆成 4 类训练日，单次更聚焦。",
+    recommendedDays: [4],
+    sessions: [
+      { name: "胸 + 三头", targets: ["chest", "triceps"] },
+      { name: "背 + 二头", targets: ["back", "biceps"] },
+      { name: "腿 + 后链", targets: ["legs", "posterior", "core"] },
+      { name: "肩 + 手臂", targets: ["shoulders", "arms", "core"] },
+    ],
+  },
+  five_way: {
+    label: "五分化 · 胸 / 背 / 腿 / 肩 / 手臂",
+    short: "五分化",
+    description: "每个训练日高度聚焦，适合偏健美式的每周 5 练。",
+    recommendedDays: [5],
+    sessions: [
+      { name: "胸", targets: ["chest", "triceps"] },
+      { name: "背", targets: ["back", "biceps"] },
+      { name: "腿", targets: ["legs", "posterior", "core"] },
+      { name: "肩", targets: ["shoulders", "triceps"] },
+      { name: "手臂 + 核心", targets: ["arms", "core"] },
+    ],
+  },
+  custom: {
+    label: "高级自定义",
+    short: "自定义",
+    description: "自己决定每个训练日的重点部位。",
+    recommendedDays: [2, 3, 4, 5, 6],
+    sessions: [],
+  },
+};
+const SPLIT_SYSTEM_KEYS = Object.keys(SPLIT_SYSTEMS);
 const MAJOR_PLAN_MUSCLES = ["胸", "背", "肩", "股四头", "后链", "臀"];
 const COMPOUND_EXERCISE_IDS = new Set(["bench-press", "push-up", "incline-dumbbell-press", "barbell-row", "lat-pulldown", "seated-row", "pull-up", "shoulder-press", "squat", "leg-press", "deadlift", "romanian-deadlift", "hip-thrust"]);
 
 function normalizeDayTargets(dayTargets, daysPerWeek) {
   if (!Array.isArray(dayTargets)) return [];
   return dayTargets.slice(0, daysPerWeek).map((targets) => [...new Set((Array.isArray(targets) ? targets : []).filter((key) => PLAN_TARGET_KEYS.includes(key)))].slice(0, 4));
+}
+
+function defaultSplitSystemForDays(daysPerWeek) {
+  const days = Number(daysPerWeek) || 4;
+  if (days <= 2) return "full_body";
+  if (days === 3) return "ppl";
+  if (days === 5) return "five_way";
+  if (days === 6) return "ppl";
+  return "upper_lower";
+}
+
+function splitSystemTargets(splitSystem, daysPerWeek) {
+  const days = Math.min(6, Math.max(2, Number(daysPerWeek) || 4));
+  const system = SPLIT_SYSTEMS[splitSystem] || SPLIT_SYSTEMS[defaultSplitSystemForDays(days)];
+  if (!system.sessions.length) return [];
+  const targets = [];
+  for (let index = 0; index < days; index += 1) {
+    targets.push(clone(system.sessions[index % system.sessions.length].targets));
+  }
+  return targets;
+}
+
+function splitSystemSessionNames(splitSystem, daysPerWeek) {
+  const days = Math.min(6, Math.max(2, Number(daysPerWeek) || 4));
+  const system = SPLIT_SYSTEMS[splitSystem] || SPLIT_SYSTEMS[defaultSplitSystemForDays(days)];
+  if (!system.sessions.length) return [];
+  const seen = new Map();
+  return Array.from({ length: days }, (_, index) => {
+    const base = system.sessions[index % system.sessions.length].name;
+    const count = (seen.get(base) || 0) + 1;
+    seen.set(base, count);
+    const totalRepeats = Array.from({ length: days }, (_, i) => system.sessions[i % system.sessions.length].name).filter((name) => name === base).length;
+    return totalRepeats > 1 ? `${base} ${String.fromCharCode(64 + count)}` : base;
+  });
+}
+
+function splitSystemCompatibilityMessage(splitSystem, daysPerWeek) {
+  const system = SPLIT_SYSTEMS[splitSystem];
+  if (!system || splitSystem === "custom") return "";
+  const days = Number(daysPerWeek) || 4;
+  if (system.recommendedDays.includes(days)) return `${system.short}与每周 ${days} 练匹配。`;
+  return `${system.short}通常更适合每周 ${system.recommendedDays.join(" 或 ")} 练；当前会按训练顺序循环安排 ${days} 个训练日。`;
 }
 
 function expandPlanTargets(targets) {
@@ -258,13 +374,15 @@ function normalizeTrainingProfile(profile) {
   const source = profile || {};
   const equipment = Array.isArray(source.equipment) ? source.equipment.filter((item) => EQUIPMENT_TYPES.includes(item)) : [];
   const daysPerWeek = Math.min(6, Math.max(2, Number(source.daysPerWeek) || 4));
+  const splitSystem = SPLIT_SYSTEM_KEYS.includes(source.splitSystem) ? source.splitSystem : (source.splitStyle === "custom" ? "custom" : defaultSplitSystemForDays(daysPerWeek));
   return {
     goal: ["hypertrophy", "strength", "fatloss"].includes(source.goal) ? source.goal : "hypertrophy",
     level: ["beginner", "intermediate", "advanced"].includes(source.level) ? source.level : "intermediate",
     daysPerWeek,
     sessionMinutes: [30, 45, 60, 75, 90].includes(Number(source.sessionMinutes)) ? Number(source.sessionMinutes) : 60,
     equipment: equipment.length ? equipment : ["barbell", "dumbbell", "machine", "bodyweight"],
-    splitStyle: source.splitStyle === "custom" ? "custom" : "recommended",
+    splitStyle: splitSystem === "custom" ? "custom" : "recommended",
+    splitSystem,
     dayTargets: normalizeDayTargets(source.dayTargets, daysPerWeek),
   };
 }
@@ -1183,6 +1301,19 @@ function renderTemplates() {
   $("#templateStatus").textContent = active
     ? `${active.runtime ? "临时 · " : ""}${active.name} · ${Math.min(activeTemplateIndex + 1, active.exercises.length)}/${active.exercises.length}`
     : "未使用模板";
+  const progress = $("#activeSessionProgress");
+  if (progress) {
+    if (!active) {
+      progress.classList.add("hidden");
+      progress.innerHTML = "";
+    } else {
+      const currentItem = active.exercises[activeTemplateIndex];
+      const currentName = exerciseById(currentItem?.exerciseId)?.name || "动作";
+      const remaining = Math.max(0, active.exercises.length - activeTemplateIndex - 1);
+      progress.classList.remove("hidden");
+      progress.innerHTML = `<div><strong>${escapeHtml(active.name)}</strong><span>整场进度 ${activeTemplateIndex + 1} / ${active.exercises.length}</span></div><p>当前：${escapeHtml(currentName)}${remaining ? ` · 后面还有 ${remaining} 个动作` : " · 最后一个动作"}</p>`;
+    }
+  }
 }
 
 function loadTemplateExercise(index) {
@@ -1434,6 +1565,31 @@ function todayPlanEntry() {
   return planEntryForDate(localDateISO());
 }
 
+function templateTotalSets(template) {
+  return (template?.exercises || []).reduce((sum, item) => sum + (item.sets?.length || 0), 0);
+}
+
+function renderTemplateExerciseList(root, template, limit = 8) {
+  if (!root) return;
+  root.innerHTML = "";
+  if (!template?.exercises?.length) {
+    root.classList.add("hidden");
+    return;
+  }
+  root.classList.remove("hidden");
+  template.exercises.slice(0, limit).forEach((item, index) => {
+    const chip = document.createElement("span");
+    const exercise = exerciseById(item.exerciseId);
+    chip.textContent = `${index + 1}. ${exercise?.name || "动作"} · ${item.sets?.length || 0}组`;
+    root.appendChild(chip);
+  });
+  if (template.exercises.length > limit) {
+    const more = document.createElement("span");
+    more.textContent = `＋${template.exercises.length - limit} 个动作`;
+    root.appendChild(more);
+  }
+}
+
 function renderTodayPlan() {
   const card = $("#todayPlanCard");
   if (!card) return;
@@ -1455,6 +1611,7 @@ function renderTodayPlan() {
     $("#todayPlanName").textContent = "今天休息";
     $("#todayPlanMeta").textContent = nextText;
     $("#startTodayPlanButton").classList.add("hidden");
+    renderTemplateExerciseList($("#todayPlanExerciseList"), null);
     if ($("#dashboardPlanName")) $("#dashboardPlanName").textContent = "今天休息";
     if ($("#dashboardPlanMeta")) $("#dashboardPlanMeta").textContent = nextText;
     $("#dashboardPlanStrip")?.classList.remove("due", "done");
@@ -1463,6 +1620,7 @@ function renderTodayPlan() {
   const planName = template?.name || "自由训练";
   const adaptiveSuffix = entry.overrideReason ? " · 智能调整" : "";
   $("#todayPlanName").textContent = `${planName}${adaptiveSuffix}`;
+  renderTemplateExerciseList($("#todayPlanExerciseList"), template);
   const nowTime = `${String(new Date().getHours()).padStart(2, "0")}:${String(new Date().getMinutes()).padStart(2, "0")}`;
   if (todayRecords.length) {
     const totals = aggregateRecords(todayRecords);
@@ -1472,7 +1630,7 @@ function renderTodayPlan() {
     card.classList.add("due");
     $("#todayPlanMeta").textContent = `训练时间 ${entry.reminderTime} 已到 · 可以开始${planName}`;
   } else {
-    $("#todayPlanMeta").textContent = template ? `训练时间 ${entry.reminderTime} · ${template.exercises.length} 个动作${entry.overrideReason ? " · 恢复调节" : ""}` : `训练时间 ${entry.reminderTime} · 自由训练`;
+    $("#todayPlanMeta").textContent = template ? `训练时间 ${entry.reminderTime} · ${template.exercises.length} 个动作 · ${templateTotalSets(template)} 组${entry.overrideReason ? " · 恢复调节" : ""}` : `训练时间 ${entry.reminderTime} · 自由训练`;
   }
   $("#startTodayPlanButton").classList.remove("hidden");
   if ($("#dashboardPlanName")) $("#dashboardPlanName").textContent = planName;
@@ -1483,6 +1641,18 @@ function renderTodayPlan() {
   $("#dashboardPlanStrip")?.classList.toggle("done", todayRecords.length > 0);
 }
 
+function updateWeeklyPlanRowSummary(row, templateId) {
+  const summary = row?.querySelector("[data-weekly-session-summary]");
+  if (!summary) return;
+  const template = state.templates.find((item) => item.id === templateId);
+  if (!template) {
+    summary.textContent = templateId ? "模板不可用" : "自由训练 · 不预设动作";
+    return;
+  }
+  const names = template.exercises.slice(0, 6).map((item) => exerciseById(item.exerciseId)?.name || "动作");
+  summary.textContent = `${template.exercises.length} 个动作 · ${templateTotalSets(template)} 组 · ${names.join(" / ")}${template.exercises.length > 6 ? " …" : ""}`;
+}
+
 function renderWeeklyPlanRows() {
   const root = $("#weeklyPlanRows");
   if (!root) return;
@@ -1491,9 +1661,10 @@ function renderWeeklyPlanRows() {
   plan.forEach((entry, dayIndex) => {
     const row = document.createElement("article");
     row.className = `weekly-plan-row ${entry.isTrainingDay ? "training-day" : "rest-day"}`;
-    const options = ['<option value="">自由训练</option>', ...state.templates.map((template) => `<option value="${template.id}" ${entry.templateId === template.id ? "selected" : ""}>${template.name}</option>`)].join("");
-    row.innerHTML = `<strong>${WEEKDAY_NAMES[dayIndex]}</strong><label class="weekly-day-toggle"><input type="checkbox" data-weekly-enabled="${dayIndex}" ${entry.isTrainingDay ? "checked" : ""}><span>${entry.isTrainingDay ? "训练" : "休息"}</span></label><div class="weekly-plan-detail ${entry.isTrainingDay ? "" : "hidden"}" data-weekly-detail="${dayIndex}"><select data-weekly-template="${dayIndex}" aria-label="${WEEKDAY_NAMES[dayIndex]}训练内容">${options}</select><input type="time" value="${entry.reminderTime || "18:00"}" data-weekly-time="${dayIndex}" aria-label="${WEEKDAY_NAMES[dayIndex]}训练时间"></div>`;
+    const options = ['<option value="">自由训练</option>', ...state.templates.map((template) => `<option value="${escapeHtml(template.id)}" ${entry.templateId === template.id ? "selected" : ""}>${escapeHtml(template.name)} · ${template.exercises.length}动作</option>`)].join("");
+    row.innerHTML = `<strong>${WEEKDAY_NAMES[dayIndex]}</strong><label class="weekly-day-toggle"><input type="checkbox" data-weekly-enabled="${dayIndex}" ${entry.isTrainingDay ? "checked" : ""}><span>${entry.isTrainingDay ? "训练" : "休息"}</span></label><div class="weekly-plan-detail ${entry.isTrainingDay ? "" : "hidden"}" data-weekly-detail="${dayIndex}"><select data-weekly-template="${dayIndex}" aria-label="${WEEKDAY_NAMES[dayIndex]}训练内容">${options}</select><input type="time" value="${entry.reminderTime || "18:00"}" data-weekly-time="${dayIndex}" aria-label="${WEEKDAY_NAMES[dayIndex]}训练时间"><small class="weekly-session-summary" data-weekly-session-summary></small></div>`;
     root.appendChild(row);
+    updateWeeklyPlanRowSummary(row, entry.templateId);
   });
 }
 
@@ -1535,7 +1706,24 @@ const TRAINING_LEVEL_LABELS = { beginner: "新手", intermediate: "中级", adva
 function renderSmartProfileSummary() {
   const profile = normalizeTrainingProfile(state.trainingProfile);
   state.trainingProfile = profile;
-  if ($("#smartProfileSummary")) $("#smartProfileSummary").textContent = `${TRAINING_GOAL_LABELS[profile.goal]} · ${TRAINING_LEVEL_LABELS[profile.level]} · 每周 ${profile.daysPerWeek} 天 · ${profile.splitStyle === "custom" ? "自定义分化" : "均衡分化"}`;
+  const system = SPLIT_SYSTEMS[profile.splitSystem] || SPLIT_SYSTEMS[defaultSplitSystemForDays(profile.daysPerWeek)];
+  if ($("#smartProfileSummary")) $("#smartProfileSummary").textContent = `${TRAINING_GOAL_LABELS[profile.goal]} · ${TRAINING_LEVEL_LABELS[profile.level]} · 每周 ${profile.daysPerWeek} 天 · ${system.short}`;
+}
+
+function currentSmartDialogProfile() {
+  const daysPerWeek = Number($("#trainingDaysInput")?.value) || 4;
+  const splitSystem = SPLIT_SYSTEM_KEYS.includes($("#trainingSplitSystemInput")?.value) ? $("#trainingSplitSystemInput").value : defaultSplitSystemForDays(daysPerWeek);
+  const dayTargets = splitSystem === "custom" ? readPlanTargetEditor("#smartPlanDayTargets") : splitSystemTargets(splitSystem, daysPerWeek);
+  return normalizeTrainingProfile({
+    goal: $("#trainingGoalInput")?.value || "hypertrophy",
+    level: $("#trainingLevelInput")?.value || "intermediate",
+    daysPerWeek,
+    sessionMinutes: Number($("#trainingMinutesInput")?.value) || 60,
+    equipment: $$("#trainingEquipmentInputs input:checked").map((input) => input.value),
+    splitStyle: splitSystem === "custom" ? "custom" : "recommended",
+    splitSystem,
+    dayTargets,
+  });
 }
 
 function openSmartPlanDialog() {
@@ -1544,35 +1732,27 @@ function openSmartPlanDialog() {
   $("#trainingLevelInput").value = profile.level;
   $("#trainingDaysInput").value = String(profile.daysPerWeek);
   $("#trainingMinutesInput").value = String(profile.sessionMinutes);
+  $("#trainingSplitSystemInput").value = profile.splitSystem || defaultSplitSystemForDays(profile.daysPerWeek);
   $$("#trainingEquipmentInputs input").forEach((input) => { input.checked = profile.equipment.includes(input.value); });
   renderPlanTargetEditor("#smartPlanDayTargets", "#smartPlanCoverage", profile.daysPerWeek, profile.dayTargets);
+  syncSmartSplitUi();
   $("#smartPlanDialog").showModal();
 }
 
 function profileFromDialog() {
-  const daysPerWeek = Number($("#trainingDaysInput").value) || 4;
-  const dayTargets = readPlanTargetEditor("#smartPlanDayTargets");
-  return normalizeTrainingProfile({
-    goal: $("#trainingGoalInput").value,
-    level: $("#trainingLevelInput").value,
-    daysPerWeek,
-    sessionMinutes: Number($("#trainingMinutesInput").value),
-    equipment: $$("#trainingEquipmentInputs input:checked").map((input) => input.value),
-    splitStyle: sameDayTargets(dayTargets, recommendedDayTargets(daysPerWeek)) ? "recommended" : "custom",
-    dayTargets,
-  });
+  return currentSmartDialogProfile();
 }
 
 function saveTrainingProfileOnly() {
   if (!$$('#trainingEquipmentInputs input:checked').length) return showToast("至少选择一种可用器械");
   const profile = profileFromDialog();
-  if (profile.dayTargets.some((targets) => !targets.length)) return showToast("每个训练日至少选择一个训练部位");
+  if (profile.splitSystem === "custom" && profile.dayTargets.some((targets) => !targets.length)) return showToast("每个训练日至少选择一个训练部位");
   state.trainingProfile = profile;
   saveState();
   renderSmartProfileSummary();
   renderRecoveryAdvisor();
   $("#smartPlanDialog").close();
-  showToast("训练目标已保存");
+  showToast("训练体系已保存");
 }
 
 function trainingPrescription(profile, exercise) {
@@ -1595,12 +1775,16 @@ function recommendedDayTargets(days) {
   return [["chest", "shoulders", "triceps"], ["back", "biceps"], ["legs", "posterior", "core"], ["chest", "shoulders", "triceps"], ["back", "biceps"], ["legs", "posterior", "core"]];
 }
 
-function routineBlueprint(days, dayTargets = null) {
+function routineBlueprint(days, dayTargets = null, splitSystem = null) {
   const normalized = normalizeDayTargets(dayTargets, days);
-  const targets = normalized.length === days && normalized.every((item) => item.length) ? normalized : recommendedDayTargets(days);
+  const systemKey = SPLIT_SYSTEM_KEYS.includes(splitSystem) ? splitSystem : defaultSplitSystemForDays(days);
+  const targets = normalized.length === days && normalized.every((item) => item.length)
+    ? normalized
+    : (systemKey === "custom" ? recommendedDayTargets(days) : splitSystemTargets(systemKey, days));
+  const systemNames = systemKey !== "custom" ? splitSystemSessionNames(systemKey, days) : [];
   return targets.map((targetKeys, index) => {
-    const label = planTargetLabel(targetKeys);
-    const repeated = targets.filter((item) => planTargetLabel(item) === label).length > 1;
+    const label = systemNames[index] || planTargetLabel(targetKeys);
+    const repeated = !systemNames.length && targets.filter((item) => planTargetLabel(item) === label).length > 1;
     const repeatIndex = targets.slice(0, index + 1).filter((item) => planTargetLabel(item) === label).length;
     return {
       name: repeated ? `${label} ${String.fromCharCode(64 + repeatIndex)}` : label,
@@ -1687,6 +1871,92 @@ function generatedTemplateFromMuscles(name, muscles, profile, minutes = profile.
   };
 }
 
+function splitPreviewData(profile) {
+  const normalized = normalizeTrainingProfile(profile);
+  const splitSystem = normalized.splitSystem || defaultSplitSystemForDays(normalized.daysPerWeek);
+  const targets = splitSystem === "custom" ? normalized.dayTargets : splitSystemTargets(splitSystem, normalized.daysPerWeek);
+  const blueprint = routineBlueprint(normalized.daysPerWeek, targets, splitSystem);
+  return blueprint.map((item, index) => {
+    const template = generatedTemplateFromMuscles(item.name, item.muscles, normalized, normalized.sessionMinutes, index);
+    const totalSets = template.exercises.reduce((sum, exercise) => sum + (exercise.sets?.length || 0), 0);
+    return {
+      name: item.name,
+      targets: item.targets,
+      exercises: template.exercises.map((exercise) => exerciseById(exercise.exerciseId)?.name || "动作"),
+      exerciseCount: template.exercises.length,
+      totalSets,
+    };
+  });
+}
+
+function renderSplitPlanPreview(rootSelector, profile) {
+  const root = $(rootSelector);
+  if (!root) return;
+  const sessions = splitPreviewData(profile);
+  root.innerHTML = sessions.map((session, index) => `<article class="split-preview-day">
+    <div class="split-preview-head"><span>第 ${index + 1} 练</span><strong>${escapeHtml(session.name)}</strong><small>${session.exerciseCount} 动作 · ${session.totalSets} 组</small></div>
+    <div class="split-preview-exercises">${session.exercises.map((name, exerciseIndex) => `<span>${exerciseIndex + 1}. ${escapeHtml(name)}</span>`).join("")}</div>
+  </article>`).join("");
+}
+
+function syncSmartSplitUi() {
+  const days = Number($("#trainingDaysInput")?.value) || 4;
+  const splitSystem = SPLIT_SYSTEM_KEYS.includes($("#trainingSplitSystemInput")?.value) ? $("#trainingSplitSystemInput").value : defaultSplitSystemForDays(days);
+  const custom = splitSystem === "custom";
+  $("#smartCustomSplitDetails")?.classList.toggle("hidden", !custom);
+  if (custom) {
+    const existing = readPlanTargetEditor("#smartPlanDayTargets");
+    if (existing.length !== days) renderPlanTargetEditor("#smartPlanDayTargets", "#smartPlanCoverage", days, recommendedDayTargets(days));
+  }
+  const profile = currentSmartDialogProfile();
+  const system = SPLIT_SYSTEMS[splitSystem];
+  if ($("#smartPlanSystemNote")) $("#smartPlanSystemNote").textContent = `${system?.description || ""} ${splitSystemCompatibilityMessage(splitSystem, days)}`.trim();
+  renderSplitPlanPreview("#smartPlanPreview", profile);
+}
+
+function renderOnboardingSplitChoices(selectedSystem, daysPerWeek) {
+  const root = $("#onboardingSplitChoices");
+  if (!root) return;
+  const days = Number(daysPerWeek) || 4;
+  root.innerHTML = ["full_body", "upper_lower", "ppl", "four_way", "five_way", "custom"].map((key) => {
+    const system = SPLIT_SYSTEMS[key];
+    const recommended = system.recommendedDays.includes(days);
+    return `<label class="split-system-choice"><input type="radio" name="onboardingSplitSystem" value="${key}" ${key === selectedSystem ? "checked" : ""}><span><strong>${system.label}</strong><small>${system.description}${recommended ? " · 适合当前频率" : ""}</small></span></label>`;
+  }).join("");
+}
+
+function selectedOnboardingSplitSystem() {
+  return $("input[name='onboardingSplitSystem']:checked")?.value || defaultSplitSystemForDays(Number($("#onboardingDays")?.value) || 4);
+}
+
+function syncOnboardingSplitUi(forceDefault = false) {
+  const days = Number($("#onboardingDays")?.value) || 4;
+  const current = forceDefault ? defaultSplitSystemForDays(days) : selectedOnboardingSplitSystem();
+  renderOnboardingSplitChoices(current, days);
+  const splitSystem = selectedOnboardingSplitSystem();
+  const custom = splitSystem === "custom";
+  $("#onboardingCustomSplitDetails")?.classList.toggle("hidden", !custom);
+  if (custom) {
+    const existing = readPlanTargetEditor("#onboardingDayTargets");
+    if (existing.length !== days) {
+      const saved = normalizeTrainingProfile(state.trainingProfile).dayTargets;
+      renderPlanTargetEditor("#onboardingDayTargets", "#onboardingCoverage", days, saved.length === days ? saved : recommendedDayTargets(days));
+    }
+  }
+  const profile = normalizeTrainingProfile({
+    goal: $("#onboardingGoal")?.value || "hypertrophy",
+    level: "intermediate",
+    daysPerWeek: days,
+    sessionMinutes: 60,
+    equipment: ["barbell", "dumbbell", "machine", "bodyweight"],
+    splitStyle: custom ? "custom" : "recommended",
+    splitSystem,
+    dayTargets: custom ? readPlanTargetEditor("#onboardingDayTargets") : splitSystemTargets(splitSystem, days),
+  });
+  if ($("#onboardingSplitNote")) $("#onboardingSplitNote").textContent = splitSystemCompatibilityMessage(splitSystem, days);
+  renderSplitPlanPreview("#onboardingPlanPreview", profile);
+}
+
 function preferredTrainingDays(count) {
   const current = normalizeWeeklyPlan(state.weeklyPlan);
   const chosen = current.filter((entry) => entry.isTrainingDay).map((entry) => entry.dayIndex);
@@ -1699,11 +1969,12 @@ function preferredTrainingDays(count) {
 
 function applySmartWeeklyPlan(profile, dayTargets = null) {
   const normalizedProfile = normalizeTrainingProfile(profile);
+  const splitSystem = SPLIT_SYSTEM_KEYS.includes(normalizedProfile.splitSystem) ? normalizedProfile.splitSystem : defaultSplitSystemForDays(normalizedProfile.daysPerWeek);
   const customTargets = normalizeDayTargets(dayTargets ?? normalizedProfile.dayTargets, normalizedProfile.daysPerWeek);
-  const resolvedTargets = customTargets.length === normalizedProfile.daysPerWeek && customTargets.every((item) => item.length)
-    ? customTargets
-    : recommendedDayTargets(normalizedProfile.daysPerWeek);
-  const blueprint = routineBlueprint(normalizedProfile.daysPerWeek, resolvedTargets);
+  const resolvedTargets = splitSystem === "custom"
+    ? (customTargets.length === normalizedProfile.daysPerWeek && customTargets.every((item) => item.length) ? customTargets : recommendedDayTargets(normalizedProfile.daysPerWeek))
+    : splitSystemTargets(splitSystem, normalizedProfile.daysPerWeek);
+  const blueprint = routineBlueprint(normalizedProfile.daysPerWeek, resolvedTargets, splitSystem);
   const templates = blueprint.map((item, index) => {
     const template = generatedTemplateFromMuscles(`${item.name} · ${TRAINING_GOAL_LABELS[normalizedProfile.goal]}`, item.muscles, normalizedProfile, normalizedProfile.sessionMinutes, index);
     template.planTargets = item.targets;
@@ -1719,8 +1990,8 @@ function applySmartWeeklyPlan(profile, dayTargets = null) {
     const previous = oldPlan[dayIndex];
     return { dayIndex, isTrainingDay: true, templateId: templates[position].id, reminderTime: previous?.reminderTime || "18:00" };
   });
-  const splitStyle = sameDayTargets(resolvedTargets, recommendedDayTargets(normalizedProfile.daysPerWeek)) ? "recommended" : "custom";
-  state.trainingProfile = normalizeTrainingProfile({ ...normalizedProfile, splitStyle, dayTargets: resolvedTargets });
+  const splitStyle = splitSystem === "custom" ? "custom" : "recommended";
+  state.trainingProfile = normalizeTrainingProfile({ ...normalizedProfile, splitStyle, splitSystem, dayTargets: resolvedTargets });
   state.planOverrides = [];
   return true;
 }
@@ -1787,7 +2058,7 @@ function handlePlanTargetChange(event, rootId, coverageId) {
 function generateSmartWeeklyPlan() {
   if (!$$('#trainingEquipmentInputs input:checked').length) return showToast("至少选择一种可用器械");
   const profile = profileFromDialog();
-  if (profile.dayTargets.some((targets) => !targets.length)) return showToast("每个训练日至少选择一个训练部位");
+  if (profile.splitSystem === "custom" && profile.dayTargets.some((targets) => !targets.length)) return showToast("每个训练日至少选择一个训练部位");
   if (!applySmartWeeklyPlan(profile, profile.dayTargets)) return showToast("当前器械条件下没有可用动作，请先补充动作或器械");
   saveState();
   renderTemplates();
@@ -1799,22 +2070,23 @@ function generateSmartWeeklyPlan() {
 }
 
 function onboardingProfile() {
+  const daysPerWeek = Number($("#onboardingDays")?.value) || 4;
+  const splitSystem = selectedOnboardingSplitSystem();
+  const custom = splitSystem === "custom";
   return normalizeTrainingProfile({
     goal: $("#onboardingGoal")?.value || "hypertrophy",
     level: "intermediate",
-    daysPerWeek: Number($("#onboardingDays")?.value) || 4,
+    daysPerWeek,
     sessionMinutes: 60,
     equipment: ["barbell", "dumbbell", "machine", "bodyweight"],
-    splitStyle: "custom",
-    dayTargets: readPlanTargetEditor("#onboardingDayTargets"),
+    splitStyle: custom ? "custom" : "recommended",
+    splitSystem,
+    dayTargets: custom ? readPlanTargetEditor("#onboardingDayTargets") : splitSystemTargets(splitSystem, daysPerWeek),
   });
 }
 
 function renderOnboardingTemplates(forceRecommended = false) {
-  const profile = normalizeTrainingProfile(state.trainingProfile);
-  const days = Number($("#onboardingDays")?.value) || profile.daysPerWeek;
-  const saved = forceRecommended ? recommendedDayTargets(days) : (profile.daysPerWeek === days ? profile.dayTargets : []);
-  renderPlanTargetEditor("#onboardingDayTargets", "#onboardingCoverage", days, saved);
+  syncOnboardingSplitUi(forceRecommended);
 }
 
 function setOnboardingStep(step) {
@@ -1822,7 +2094,7 @@ function setOnboardingStep(step) {
   $$("[data-onboarding-step]").forEach((panel) => panel.classList.toggle("active", Number(panel.dataset.onboardingStep) === target));
   if ($("#onboardingProgressText")) $("#onboardingProgressText").textContent = `${target} / 3`;
   if ($("#onboardingProgressBar")) $("#onboardingProgressBar").style.width = `${target / 3 * 100}%`;
-  if (target === 2 && !$("#onboardingDayTargets")?.children.length) renderOnboardingTemplates();
+  if (target === 2) renderOnboardingTemplates(false);
 }
 
 function openOnboarding(reset = false) {
@@ -1838,6 +2110,7 @@ function openOnboarding(reset = false) {
   const radio = $(`input[name="onboardingNutrition"][value="${nutritionValue}"]`);
   if (radio) radio.checked = true;
   if ($("#onboardingDayTargets")) $("#onboardingDayTargets").innerHTML = "";
+  renderOnboardingSplitChoices(profile.splitSystem || defaultSplitSystemForDays(profile.daysPerWeek), profile.daysPerWeek);
   setOnboardingStep(1);
   renderOnboardingNutritionState();
   if (!$("#onboardingDialog").open) $("#onboardingDialog").showModal();
@@ -1851,7 +2124,7 @@ function renderOnboardingNutritionState() {
 
 function finishOnboarding() {
   const profile = onboardingProfile();
-  if (profile.dayTargets.some((targets) => !targets.length)) return showToast("每个训练日至少选择一个训练部位");
+  if (profile.splitSystem === "custom" && profile.dayTargets.some((targets) => !targets.length)) return showToast("每个训练日至少选择一个训练部位");
   state.settings.weightUnit = $("#onboardingWeightUnit")?.value === "lb" ? "lb" : "kg";
   state.settings.nutritionEnabled = $("input[name='onboardingNutrition']:checked")?.value !== "no";
   if (state.settings.nutritionEnabled) {
@@ -3970,6 +4243,11 @@ function bindEvents() {
     $("#weeklyPlanDialog").showModal();
   });
   $("#weeklyPlanRows").addEventListener("change", (event) => {
+    const templateSelect = event.target.closest("[data-weekly-template]");
+    if (templateSelect) {
+      updateWeeklyPlanRowSummary(templateSelect.closest(".weekly-plan-row"), templateSelect.value);
+      return;
+    }
     const toggle = event.target.closest("[data-weekly-enabled]");
     if (!toggle) return;
     const dayIndex = toggle.dataset.weeklyEnabled;
@@ -3989,9 +4267,22 @@ function bindEvents() {
   $("#closeSmartPlanButton").addEventListener("click", () => $("#smartPlanDialog").close());
   $("#saveTrainingProfileButton").addEventListener("click", saveTrainingProfileOnly);
   $("#generateWeeklyPlanButton").addEventListener("click", generateSmartWeeklyPlan);
-  $("#trainingDaysInput").addEventListener("change", () => resetPlanTargetEditor("#smartPlanDayTargets", "#smartPlanCoverage", Number($("#trainingDaysInput").value) || 4));
-  $("#resetSmartSplitButton").addEventListener("click", () => resetPlanTargetEditor("#smartPlanDayTargets", "#smartPlanCoverage", Number($("#trainingDaysInput").value) || 4));
-  $("#smartPlanDayTargets").addEventListener("change", (event) => handlePlanTargetChange(event, "#smartPlanDayTargets", "#smartPlanCoverage"));
+  $("#trainingDaysInput").addEventListener("change", () => {
+    const days = Number($("#trainingDaysInput").value) || 4;
+    if ($("#trainingSplitSystemInput").value === "custom") resetPlanTargetEditor("#smartPlanDayTargets", "#smartPlanCoverage", days);
+    syncSmartSplitUi();
+  });
+  $("#trainingSplitSystemInput").addEventListener("change", syncSmartSplitUi);
+  ["#trainingGoalInput", "#trainingLevelInput", "#trainingMinutesInput"].forEach((selector) => $(selector).addEventListener("change", syncSmartSplitUi));
+  $("#trainingEquipmentInputs").addEventListener("change", syncSmartSplitUi);
+  $("#resetSmartSplitButton").addEventListener("click", () => {
+    resetPlanTargetEditor("#smartPlanDayTargets", "#smartPlanCoverage", Number($("#trainingDaysInput").value) || 4);
+    syncSmartSplitUi();
+  });
+  $("#smartPlanDayTargets").addEventListener("change", (event) => {
+    handlePlanTargetChange(event, "#smartPlanDayTargets", "#smartPlanCoverage");
+    syncSmartSplitUi();
+  });
   $("#workoutCreatorButton").addEventListener("click", openWorkoutCreator);
   $("#recoveryWorkoutButton").addEventListener("click", startRecoveryWorkout);
   $("#adaptivePlanButton").addEventListener("click", openAdaptivePlanDialog);
@@ -4234,9 +4525,19 @@ function bindEvents() {
 
   $$("[data-onboarding-next]").forEach((button) => button.addEventListener("click", () => setOnboardingStep(button.dataset.onboardingNext)));
   $$("[data-onboarding-back]").forEach((button) => button.addEventListener("click", () => setOnboardingStep(button.dataset.onboardingBack)));
-  $("#onboardingDays").addEventListener("change", () => renderOnboardingTemplates(true));
-  $("#resetOnboardingSplitButton").addEventListener("click", () => resetPlanTargetEditor("#onboardingDayTargets", "#onboardingCoverage", Number($("#onboardingDays").value) || 4));
-  $("#onboardingDayTargets").addEventListener("change", (event) => handlePlanTargetChange(event, "#onboardingDayTargets", "#onboardingCoverage"));
+  $("#onboardingDays").addEventListener("change", () => syncOnboardingSplitUi(true));
+  $("#onboardingGoal").addEventListener("change", () => syncOnboardingSplitUi(false));
+  $("#onboardingSplitChoices").addEventListener("change", (event) => {
+    if (event.target.matches("input[name='onboardingSplitSystem']")) syncOnboardingSplitUi(false);
+  });
+  $("#resetOnboardingSplitButton").addEventListener("click", () => {
+    resetPlanTargetEditor("#onboardingDayTargets", "#onboardingCoverage", Number($("#onboardingDays").value) || 4);
+    syncOnboardingSplitUi(false);
+  });
+  $("#onboardingDayTargets").addEventListener("change", (event) => {
+    handlePlanTargetChange(event, "#onboardingDayTargets", "#onboardingCoverage");
+    syncOnboardingSplitUi(false);
+  });
   $$("input[name='onboardingNutrition']").forEach((input) => input.addEventListener("change", renderOnboardingNutritionState));
   $("#finishOnboardingButton").addEventListener("click", finishOnboarding);
   $("#onboardingDialog").addEventListener("cancel", (event) => {
