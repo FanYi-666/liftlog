@@ -24,7 +24,7 @@
     })();
   </script>
   <link rel="manifest" href="manifest.webmanifest" />
-  <link rel="stylesheet" href="styles.css?v=21" />
+  <link rel="stylesheet" href="styles.css?v=25" />
 </head>
 <body>
   <div class="app-shell">
@@ -276,6 +276,16 @@
         </div>
         <div id="activeSessionProgress" class="active-session-progress hidden"></div>
 
+        <section class="weekly-volume-card" id="weeklyVolumeCard">
+          <div class="weekly-volume-head">
+            <div><p class="eyebrow">WEEKLY VOLUME</p><h3>本周肌群训练量</h3></div>
+            <span>等效组估算</span>
+          </div>
+          <p class="muted" id="weeklyVolumeSummary">会根据当前训练目标显示每个肌群的周训练量参考。</p>
+          <div id="weeklyVolumeRows" class="weekly-volume-rows"></div>
+          <p class="weekly-volume-note">用于训练安排参考，不是精确生理测量；热身组不计入。</p>
+        </section>
+
         <details class="fold-section" data-module-key="trainingSmart">
           <summary class="fold-summary"><span><b>计划与智能训练</b><small>Smart Plan · 恢复顾问 · 模板</small></span><i>展开</i></summary>
           <div class="fold-content">
@@ -367,15 +377,19 @@
           <div id="trainingExerciseTrendChart" class="mini-line-chart"></div>
         </section>
 
-        <details class="fold-section compact-fold" data-module-key="trainingAdvanced">
-          <summary class="fold-summary"><span><b>高级训练工具</b><small>进阶建议 · 实时对比 · 编组与计算器</small></span><i>展开</i></summary>
-          <div class="fold-content">
         <article class="progression-suggestion-card" id="progressionSuggestionCard">
-          <div><p class="eyebrow">NEXT SESSION</p><h3>下一次怎么进步</h3></div>
+          <div class="progression-suggestion-head">
+            <div><p class="eyebrow">PROGRESSIVE OVERLOAD</p><h3>下一次渐进建议</h3></div>
+            <span id="progressionSuggestionBadge" class="progression-suggestion-badge">建立基线</span>
+          </div>
           <strong id="progressionSuggestionTitle">先完成一次这个动作</strong>
-          <p class="muted" id="progressionSuggestionBody">有训练记录后，会根据重量、次数、RPE 和训练反馈给出下一次建议。</p>
+          <p class="muted" id="progressionSuggestionBody">会结合最近几次的重量、次数、RPE 和训练反馈给出下一次建议。</p>
+          <small id="progressionSuggestionTrend" class="progression-suggestion-trend">建议会在积累 2–3 次可比较训练后更稳定。</small>
         </article>
 
+        <details class="fold-section compact-fold" data-module-key="trainingAdvanced">
+          <summary class="fold-summary"><span><b>高级训练工具</b><small>实时对比 · 编组与计算器</small></span><i>展开</i></summary>
+          <div class="fold-content">
         <div class="training-performance-grid">
           <article class="focus-metric-card">
             <div class="tool-card-head">
@@ -607,6 +621,221 @@
         </details>
       </section>
 
+      <section class="page theory-page" data-page="theory">
+        <div class="page-title theory-title">
+          <div>
+            <p class="eyebrow">TRAINING PRINCIPLES</p>
+            <h2>训练原理</h2>
+            <p class="muted page-note">按学习顺序理解目标、刺激、训练量、强度、动作、渐进、恢复、有氧和一周计划。</p>
+          </div>
+        </div>
+
+        <section class="theory-hero">
+          <p class="eyebrow">THE CORE</p>
+          <h3>训练的内核：管理适应，而不是收集疲劳</h3>
+          <p>训练是在给身体一个需要适应的任务。刺激太少，改变有限；刺激太多而恢复跟不上，表现会下降。真正长期有效的计划，是让刺激足够、恢复可承受，并在适应后逐步提高要求。</p>
+          <div class="theory-loop" aria-label="训练适应循环"><span>刺激</span><b>→</b><span>恢复</span><b>→</b><span>适应</span><b>→</b><span>渐进</span></div>
+        </section>
+
+        <nav class="theory-path" aria-label="训练原理学习路径">
+          <a href="#theory-goal"><b>01</b><span>先定目标</span></a>
+          <a href="#theory-adaptation"><b>02</b><span>理解适应</span></a>
+          <a href="#theory-dose"><b>03</b><span>控制剂量</span></a>
+          <a href="#theory-exercise"><b>04</b><span>选择动作</span></a>
+          <a href="#theory-progress"><b>05</b><span>持续渐进</span></a>
+          <a href="#theory-recovery"><b>06</b><span>管理恢复</span></a>
+          <a href="#theory-cardio"><b>07</b><span>理解有氧</span></a>
+          <a href="#theory-concurrent"><b>08</b><span>并行训练</span></a>
+          <a href="#theory-program"><b>09</b><span>组成一周</span></a>
+        </nav>
+
+        <section class="theory-section theory-module" id="theory-goal">
+          <div class="theory-module-head"><span>01</span><div><p class="eyebrow">GOAL</p><h2>先定义“练得好”是什么意思</h2></div></div>
+          <p class="theory-lead">训练变量没有脱离目标的“绝对最佳”。增肌、力量、心肺和综合健康，需要强调的东西不同。</p>
+          <div class="theory-rule-grid four">
+            <article><strong>增肌</strong><p>重点是给目标肌群足够且可恢复的周训练量，并让正式组保持较高努力程度。</p></article>
+            <article><strong>力量</strong><p>更强调高负荷、具体动作练习和技术熟练度。想让卧推更强，就需要持续练卧推或高度相似的动作。</p></article>
+            <article><strong>耐力</strong><p>重点是持续时间、频率和有氧专项刺激；力量训练用于补充肌力和结构能力。</p></article>
+            <article><strong>综合健康</strong><p>不追求单项极限。规律的力量训练与足够的有氧活动同时存在，通常比只做一种更完整。</p></article>
+          </div>
+          <div class="theory-takeaway"><b>先问自己：</b>未来 8–12 周，我最想提高什么？然后让大部分训练资源服务于这个主目标。</div>
+        </section>
+
+        <section class="theory-section theory-module" id="theory-adaptation">
+          <div class="theory-module-head"><span>02</span><div><p class="eyebrow">ADAPTATION</p><h2>肌肉和力量到底是怎么练出来的</h2></div></div>
+          <p class="theory-lead">一次训练只是刺激，真正的进步发生在反复刺激和恢复之后。肌肉增长与力量增长有重叠，但不是完全同一件事。</p>
+          <div class="theory-compare-grid">
+            <article><strong>肌肥大更关心</strong><p>目标肌群是否真正承担负荷、周训练量是否足够、正式组是否足够努力、长期是否持续渐进。</p></article>
+            <article><strong>力量更关心</strong><p>肌肉基础之外，还高度依赖高负荷练习、动作技术、神经募集和对具体动作的熟练度。</p></article>
+          </div>
+          <div class="theory-takeaway"><b>所以：</b>“肌肉更大”通常有利于更强，但只做大量轻负荷增肌训练，并不等于某个 1RM 动作一定达到最佳。</div>
+        </section>
+
+        <section class="theory-section theory-module" id="theory-dose">
+          <div class="theory-module-head"><span>03</span><div><p class="eyebrow">DOSE</p><h2>决定训练剂量的 5 个旋钮</h2></div></div>
+          <div class="theory-variable-list">
+            <article><b>负荷</b><strong>你举多重</strong><p>较高负荷更有利于最大力量；增肌可以在更宽的负荷范围发生，只要训练足够努力。</p></article>
+            <article><b>训练量</b><strong>你做多少高质量正式组</strong><p>增肌对周训练量比较敏感。ACSM 2026 把约 ≥10 组/肌群/周作为提高肌肥大的有用参考，不代表每个人都必须固定在一个数字。</p></article>
+            <article><b>努力程度</b><strong>离力竭还有多远</strong><p>RPE 8 约等于还可做 2 次（RIR 2）。多数正式组可以接近力竭，但不需要每一组都做到完全失败。</p></article>
+            <article><b>频率</b><strong>一周把这些组分几次做</strong><p>频率很大程度上是分配训练量和管理单次疲劳的工具。总量相近时，分化名称本身通常不是魔法。</p></article>
+            <article><b>休息</b><strong>下一组前恢复多少</strong><p>休息太短可能让下一组次数或负荷明显下降。复合动作和力量训练通常需要更充分的组间恢复。</p></article>
+          </div>
+          <div class="theory-takeaway"><b>LiftLog 对应：</b>周肌群训练量看“量”，RPE 看“努力程度”，组间计时看“恢复”，渐进建议看长期刺激是否需要提高。</div>
+        </section>
+
+        <section class="theory-section theory-module" id="theory-exercise">
+          <div class="theory-module-head"><span>04</span><div><p class="eyebrow">EXERCISE</p><h2>没有神奇动作，只有适合目标的动作</h2></div></div>
+          <p class="theory-lead">选择动作时，比“网上排名第一”更重要的是：能稳定训练目标肌群、可重复、可渐进，而且不会持续引发异常疼痛。</p>
+          <div class="theory-rule-grid">
+            <article><strong>复合动作</strong><p>一次覆盖多个肌群，适合做训练骨架，例如卧推、深蹲、划船、引体和髋铰链。</p></article>
+            <article><strong>孤立动作</strong><p>用于补复合动作覆盖不足的部位，例如侧平举、弯举、三头伸展、腿弯举。</p></article>
+            <article><strong>活动范围</strong><p>在能够稳定控制的前提下，较完整的 ROM 通常是可靠默认选择；不需要为了追求“标准深度”强行进入疼痛范围。</p></article>
+            <article><strong>稳定性</strong><p>增肌动作不一定越复杂越好。足够稳定往往更容易让目标肌群承受负荷并长期追踪进步。</p></article>
+          </div>
+          <div class="theory-takeaway"><b>动作库的逻辑：</b>先覆盖水平推、垂直推、水平拉、垂直拉、膝主导、髋主导，再用肩、手臂、小腿和核心动作补充。</div>
+        </section>
+
+        <section class="theory-section theory-module" id="theory-progress">
+          <div class="theory-module-head"><span>05</span><div><p class="eyebrow">PROGRESSION</p><h2>渐进式负荷不是“每周硬加重量”</h2></div></div>
+          <div class="theory-progression-example">
+            <span>80kg × 8</span><b>→</b><span>80kg × 9</span><b>→</b><span>80kg × 10</span><b>→</b><span>82.5kg × 8</span>
+          </div>
+          <p class="theory-lead">这是一种简单的双重渐进：先在同一重量下提高重复次数，达到目标区间上沿且 RPE 仍可控，再小幅加重量。进步也可以表现为更多高质量组、更稳定的技术或更难的自重变式。</p>
+          <div class="theory-rule-grid three">
+            <article><strong>表现上升</strong><p>次数增加、同重量 RPE 下降或动作更稳定 → 继续渐进。</p></article>
+            <article><strong>短期没变</strong><p>一两次训练停住很正常 → 先保持，不必立刻换计划。</p></article>
+            <article><strong>连续倒退</strong><p>次数下降且 RPE 持续升高 → 先检查疲劳、恢复和总训练量，必要时短期降载。</p></article>
+          </div>
+        </section>
+
+        <section class="theory-section theory-module" id="theory-recovery">
+          <div class="theory-module-head"><span>06</span><div><p class="eyebrow">RECOVERY & RISK</p><h2>恢复和降低不必要风险</h2></div></div>
+          <p class="theory-lead">恢复不是固定的 48 或 72 小时倒计时，也不存在一种训练方法可以保证不受伤。更现实的做法是管理可以控制的风险因素。</p>
+          <div class="theory-rule-grid">
+            <article><strong>渐进要小步</strong><p>重量、训练量和高强度有氧不要同时突然大幅增加。让身体有时间适应新的要求。</p></article>
+            <article><strong>技术要可重复</strong><p>没有所有人唯一正确的姿势，但动作应该稳定、可控制，并适合你的结构和训练目标。</p></article>
+            <article><strong>疲劳会改变表现</strong><p>连续高 RPE、次数下降、睡眠差和明显全身疲劳出现时，不要把“硬顶”自动理解成意志力。</p></article>
+            <article><strong>疼痛要区别对待</strong><p>普通肌肉酸胀和持续锐痛、麻木、关节异常不是一回事。后者不应靠普通训练建议硬解决。</p></article>
+          </div>
+          <p class="theory-note">LiftLog 的恢复百分比只是基于训练记录的负荷估算，不是肌肉组织、生理恢复或伤病状态的测量。</p>
+        </section>
+
+        <section class="theory-section theory-module" id="theory-cardio">
+          <div class="theory-module-head"><span>07</span><div><p class="eyebrow">CARDIO</p><h2>有氧训练到底在练什么</h2></div></div>
+          <p class="theory-lead">有氧不是“减脂专用工具”。它训练心肺、耐力和持续工作能力，同时也是综合健康的重要组成部分。</p>
+          <div class="theory-cardio-levels">
+            <article><span>轻松</span><strong>可以完整聊天</strong><p>恢复压力较小，适合快走、轻松骑行或很轻的慢跑，可用于累积活动量。</p></article>
+            <article><span>中等</span><strong>能说短句，但明显在运动</strong><p>适合建立有氧基础。WHO 的每周中等强度活动建议可用这一层级理解。</p></article>
+            <article><span>高强度</span><strong>讲话困难，需要明显恢复</strong><p>时间效率高，但疲劳成本也更高；如果同时做大量腿部力量训练，需要更谨慎安排。</p></article>
+          </div>
+          <div class="theory-takeaway"><b>健康基线：</b>成年人可参考每周 150–300 分钟中等强度，或 75–150 分钟高强度有氧，并至少 2 天进行覆盖主要肌群的力量训练。</div>
+        </section>
+
+        <section class="theory-section" id="theory-concurrent">
+          <div class="section-heading">
+            <div><p class="eyebrow">08 · CONCURRENT TRAINING</p><h2>肌肉训练和有氧怎么平衡</h2></div>
+          </div>
+          <div class="theory-callout">
+            <strong>不是二选一。</strong>
+            <p>力量训练负责肌力、肌肉和骨骼刺激；有氧训练主要提升心肺和耐力。大多数人把两者放在同一周内，比只做其中一种更完整。</p>
+          </div>
+          <div class="balance-guide-grid">
+            <article>
+              <span>健康均衡</span>
+              <strong>力量 2–4 天 + 有氧达到健康基线</strong>
+              <p>成年人可把每周 150–300 分钟中等强度有氧，或 75–150 分钟高强度有氧作为健康参考，同时至少 2 天覆盖主要肌群的力量训练。</p>
+            </article>
+            <article>
+              <span>增肌优先</span>
+              <strong>先保证力量训练质量，再加入可恢复的有氧</strong>
+              <p>有氧不需要因为增肌完全取消。优先低到中等强度、不过度占用腿部恢复；同一天都做时，可以把最重要的训练放前面。</p>
+            </article>
+            <article>
+              <span>耐力优先</span>
+              <strong>有氧是主课，力量训练负责保留力量和肌肉</strong>
+              <p>把关键跑步、骑行或其他耐力课放在状态最好时，同时保留每周至少 2 次力量刺激，尤其不要长期完全放弃下肢力量。</p>
+            </article>
+          </div>
+          <p class="theory-note">并行训练研究总体显示：把力量和有氧合理组合，并不必然妨碍最大力量或肌肥大；更需要注意的是总疲劳、同一训练单元里的爆发力表现，以及你的首要目标。</p>
+        </section>
+
+        <section class="theory-section theory-glossary">
+          <div class="section-heading"><div><p class="eyebrow">GLOSSARY</p><h2>把常用概念串起来</h2></div></div>
+          <div class="theory-concept-list">
+            <details open>
+              <summary><span><b>渐进式负荷</b><small>Progressive overload</small></span><i>›</i></summary>
+              <div><p>身体适应以后，需要逐渐提高训练刺激。渐进不只等于加重量，也可以是相同重量完成更多次数、更多高质量正式组，或在相同训练量下用更好的动作控制完成。</p><p class="theory-link-note">LiftLog 的“下一次渐进建议”就是把这个原则落到每个动作上。</p></div>
+            </details>
+            <details>
+              <summary><span><b>训练量</b><small>Volume</small></span><i>›</i></summary>
+              <div><p>训练量可以用正式组数、次数和重量等方式描述。对增肌而言，周训练量很重要，但不是越多越好；超过恢复能力的训练量只会增加疲劳。LiftLog 用主肌群 1 组、次要参与 0.5 组的“等效组”帮助观察分配。</p></div>
+            </details>
+            <details>
+              <summary><span><b>训练强度与接近力竭</b><small>RPE / RIR</small></span><i>›</i></summary>
+              <div><p>训练需要足够努力，但没有必要让每一组都彻底力竭。RPE 8 大致意味着还能完成约 2 次；它可以帮助判断当前重量是不是太轻、合适或过于勉强。</p></div>
+            </details>
+            <details>
+              <summary><span><b>训练频率与分化</b><small>Frequency & split</small></span><i>›</i></summary>
+              <div><p>全身、二分化、三分化、四分化本质上都是“如何把一周训练量分配到不同日期”。当总训练量和执行质量接近时，分化名称本身通常不是决定训练效果的核心。</p></div>
+            </details>
+            <details>
+              <summary><span><b>并行训练干扰</b><small>Concurrent training</small></span><i>›</i></summary>
+              <div><p>力量与有氧一起训练时，所谓“干扰效应”并不是有氧一定吃掉肌肉。最新综述显示，两者合理并行时最大力量和肌肥大总体可以保持良好发展；如果你特别重视爆发力或某一项表现，则更需要管理训练顺序、间隔和总疲劳。</p></div>
+            </details>
+            <details>
+              <summary><span><b>恢复</b><small>Recovery</small></span><i>›</i></summary>
+              <div><p>恢复不是固定的“72 小时倒计时”。睡眠、训练量、RPE、动作类型、饮食和生活压力都会影响下一次训练状态。酸痛也不等于训练有效，更不等于肌肉已经或尚未恢复。</p></div>
+            </details>
+          </div>
+        </section>
+
+        <section class="theory-section theory-module" id="theory-program">
+          <div class="theory-module-head"><span>09</span><div><p class="eyebrow">PROGRAMMING</p><h2>把原理变成一周计划</h2></div></div>
+          <div class="theory-program-steps">
+            <article><b>1</b><div><strong>先确定主目标</strong><p>增肌、力量、耐力或健康均衡，只选一个主优先级，其余作为兼顾目标。</p></div></article>
+            <article><b>2</b><div><strong>确定每周可稳定训练的天数</strong><p>先看生活现实，再选二分化、三分化或其他结构；分化只是承载训练量的容器。</p></div></article>
+            <article><b>3</b><div><strong>给主要肌群分配周训练量</strong><p>从可恢复的量开始，不要为了追数字一次堆太多。用 LiftLog 的周肌群训练量观察实际完成情况。</p></div></article>
+            <article><b>4</b><div><strong>用动作模式覆盖全身</strong><p>推、拉、膝主导、髋主导是骨架，再根据目标补肩、手臂、小腿和核心。</p></div></article>
+            <article><b>5</b><div><strong>加入有氧，而不是和力量互相挤压</strong><p>根据主目标决定有氧的频率和强度，高疲劳腿部有氧不要无脑堆在最重要的下肢力量课旁边。</p></div></article>
+            <article><b>6</b><div><strong>连续执行，再用数据调整</strong><p>看 2–4 周趋势，而不是被单次训练波动带着走。能稳定进步就不要频繁换计划。</p></div></article>
+          </div>
+          <div class="section-heading theory-example-heading"><div><p class="eyebrow">EXAMPLES</p><h3>三种常见目标的周结构</h3></div></div>
+          <div class="theory-week-examples">
+            <article><strong>增肌 / 力量优先</strong><p>力量训练作为主轴；在不明显影响腿部训练表现和恢复的前提下加入 2–3 次较轻到中等强度有氧。硬腿日附近避免堆大量高强度跑步。</p></article>
+            <article><strong>健康均衡</strong><p>把力量和有氧都当成基础能力：每周 2–4 次力量，剩余日期通过快走、慢跑、骑行、游泳等累积有氧活动。</p></article>
+            <article><strong>耐力优先</strong><p>围绕关键耐力课安排一周，力量训练减少到足以维持/提高力量的剂量；如果同日进行，把当天最重要的训练放在前面。</p></article>
+          </div>
+          <p class="theory-note">这些是一般训练组织原则，不是医疗或伤病康复处方。出现持续疼痛、麻木、明显功能受限或急性损伤时，不应继续按普通训练建议硬练。</p>
+        </section>
+
+        <section class="theory-section theory-myths">
+          <div class="section-heading"><div><p class="eyebrow">CHECK YOUR MODEL</p><h2>几个最容易把训练想歪的地方</h2></div></div>
+          <div class="theory-myth-grid">
+            <article><b>误区</b><strong>越酸、越累 = 越有效</strong><p>疲劳和酸痛只是训练后的现象，不是进步本身。真正要看的是长期表现、训练量和身体适应。</p></article>
+            <article><b>误区</b><strong>每组必须力竭</strong><p>足够努力很重要，但完全力竭不是所有正式组的必要条件；它往往还会增加后续疲劳。</p></article>
+            <article><b>误区</b><strong>有氧会把肌肉练没</strong><p>合理的并行训练总体可以同时改善有氧能力、力量和肌肥大；关键是总训练负荷与优先级。</p></article>
+            <article><b>误区</b><strong>分化越高级越科学</strong><p>全身、上下肢、PPL 都只是组织周训练量的方式。适合频率、恢复和生活节奏才重要。</p></article>
+            <article><b>误区</b><strong>计划必须经常换才不会适应</strong><p>适应恰恰是训练目标。只有当计划无法继续提供合适刺激、长期停滞或现实条件改变时，才需要调整。</p></article>
+            <article><b>误区</b><strong>动作越复杂越专业</strong><p>对增肌和基础力量而言，稳定、可重复、可渐进的动作通常比炫技更有长期价值。</p></article>
+          </div>
+        </section>
+
+        <section class="theory-sources">
+          <div>
+            <p class="eyebrow">EVIDENCE</p><h2>证据地图</h2>
+            <p class="theory-note">“强”表示指南、Umbrella Review 或多项系统综述方向较一致；“较强”表示已有多项研究支持，但具体剂量仍受人群和目标影响。这里提供原始来源，不把单篇论文当成绝对答案。</p>
+          </div>
+          <a href="https://pubmed.ncbi.nlm.nih.gov/41843416/" target="_blank" rel="noopener noreferrer"><strong><i class="evidence-grade strong">强</i> ACSM 2026 阻力训练立场文件</strong><span>137 项系统综述：力量、肌肥大、负荷、训练量、ROM、频率等 ›</span></a>
+          <a href="https://www.who.int/europe/news-room/fact-sheets/item/physical-activity" target="_blank" rel="noopener noreferrer"><strong><i class="evidence-grade strong">强</i> WHO 身体活动建议</strong><span>成年人有氧活动与肌力训练健康基线 ›</span></a>
+          <a href="https://pubmed.ncbi.nlm.nih.gov/41762427/" target="_blank" rel="noopener noreferrer"><strong><i class="evidence-grade strong">强</i> 2026 并行训练 Umbrella Review</strong><span>17 项 Meta 分析：有氧、力量、爆发力与肌肥大兼容性 ›</span></a>
+          <a href="https://pubmed.ncbi.nlm.nih.gov/27433992/" target="_blank" rel="noopener noreferrer"><strong><i class="evidence-grade strong">强</i> 周训练量与肌肥大 Meta 分析</strong><span>训练量与肌肉增长的剂量反应关系 ›</span></a>
+          <a href="https://pubmed.ncbi.nlm.nih.gov/30558493/" target="_blank" rel="noopener noreferrer"><strong><i class="evidence-grade strong">强</i> 训练频率与肌肥大 Meta 分析</strong><span>总训练量相同时，频率更多是训练量分配工具 ›</span></a>
+          <a href="https://pubmed.ncbi.nlm.nih.gov/34170576/" target="_blank" rel="noopener noreferrer"><strong><i class="evidence-grade strong">强</i> 动作活动范围系统综述与 Meta 分析</strong><span>完整与部分 ROM 对力量和肌肥大的影响 ›</span></a>
+          <a href="https://pubmed.ncbi.nlm.nih.gov/39205815/" target="_blank" rel="noopener noreferrer"><strong><i class="evidence-grade medium">较强</i> 组间休息与肌肥大 Meta 分析</strong><span>过短休息、训练容量与肌肥大的关系 ›</span></a>
+          <a href="https://pubmed.ncbi.nlm.nih.gov/33054335/" target="_blank" rel="noopener noreferrer"><strong><i class="evidence-grade strong">强</i> 阻力训练健康收益综述</strong><span>健康收益与已报告的不良事件证据 ›</span></a>
+        </section>
+      </section>
+
       <section class="page" data-page="history">
         <div class="page-title">
           <p class="eyebrow">HISTORY</p>
@@ -627,6 +856,7 @@
       <button class="nav-item" data-nav="calories" data-nutrition-surface><span>◉</span><small>饮食</small></button>
       <button class="nav-item nav-add" data-nav="log"><span>＋</span><small>训练</small></button>
       <button class="nav-item" data-nav="analytics"><span>⌁</span><small>趋势</small></button>
+      <button class="nav-item" data-nav="theory"><span>◎</span><small>理论</small></button>
       <button class="nav-item" data-nav="history"><span>▤</span><small>历史</small></button>
     </nav>
   </div>
@@ -1045,6 +1275,6 @@
   </div>
 
   <div id="toast" class="toast" role="status"></div>
-  <script src="app.js?v=21"></script>
+  <script src="app.js?v=25"></script>
 </body>
 </html>

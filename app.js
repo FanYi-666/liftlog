@@ -1,5 +1,5 @@
 const STORAGE_KEY = "liftlog-v1";
-const SCHEMA_VERSION = 16;
+const SCHEMA_VERSION = 17;
 
 const defaultState = {
   schemaVersion: SCHEMA_VERSION,
@@ -50,6 +50,23 @@ const defaultState = {
     { id: "plank", name: "平板支撑", mode: "bodyweight", primaryMuscle: "核心", equipment: "bodyweight", recoveryPrimary: "核心", recoverySecondary: [] },
     { id: "cable-crunch", name: "绳索卷腹", mode: "weighted", primaryMuscle: "核心", equipment: "machine", recoveryPrimary: "核心", recoverySecondary: [] },
     { id: "overhead-triceps-extension", name: "过顶三头伸展", mode: "weighted", primaryMuscle: "三头", equipment: "machine", recoveryPrimary: "三头", recoverySecondary: [] },
+    { id: "incline-push-up", name: "上斜俯卧撑", mode: "bodyweight", primaryMuscle: "胸", equipment: "bodyweight", recoveryPrimary: "胸", recoverySecondary: ["三头", "肩前束"] },
+    { id: "diamond-push-up", name: "钻石俯卧撑", mode: "bodyweight", primaryMuscle: "三头", equipment: "bodyweight", recoveryPrimary: "三头", recoverySecondary: ["胸", "肩前束"] },
+    { id: "pike-push-up", name: "派克俯卧撑", mode: "bodyweight", primaryMuscle: "肩", equipment: "bodyweight", recoveryPrimary: "肩前束", recoverySecondary: ["三头", "肩中束"] },
+    { id: "elevated-pike-push-up", name: "高位派克俯卧撑", mode: "bodyweight", primaryMuscle: "肩", equipment: "bodyweight", recoveryPrimary: "肩前束", recoverySecondary: ["三头", "肩中束"] },
+    { id: "chin-up", name: "反手引体向上", mode: "bodyweight", primaryMuscle: "背", equipment: "bodyweight", recoveryPrimary: "背", recoverySecondary: ["二头", "肩后束"] },
+    { id: "inverted-row", name: "自重反向划船", mode: "bodyweight", primaryMuscle: "背", equipment: "bodyweight", recoveryPrimary: "背", recoverySecondary: ["二头", "肩后束"] },
+    { id: "bodyweight-squat", name: "徒手深蹲", mode: "bodyweight", primaryMuscle: "股四头", equipment: "bodyweight", recoveryPrimary: "股四头", recoverySecondary: ["臀", "核心"] },
+    { id: "reverse-lunge", name: "反向箭步蹲", mode: "bodyweight", primaryMuscle: "股四头", equipment: "bodyweight", recoveryPrimary: "股四头", recoverySecondary: ["臀", "核心"] },
+    { id: "bulgarian-split-squat", name: "保加利亚分腿蹲", mode: "bodyweight", primaryMuscle: "股四头", equipment: "bodyweight", recoveryPrimary: "股四头", recoverySecondary: ["臀", "核心"] },
+    { id: "glute-bridge", name: "自重臀桥", mode: "bodyweight", primaryMuscle: "臀", equipment: "bodyweight", recoveryPrimary: "臀", recoverySecondary: ["后链", "核心"] },
+    { id: "single-leg-glute-bridge", name: "单腿臀桥", mode: "bodyweight", primaryMuscle: "臀", equipment: "bodyweight", recoveryPrimary: "臀", recoverySecondary: ["后链", "核心"] },
+    { id: "hamstring-walkout", name: "腘绳肌走步", mode: "bodyweight", primaryMuscle: "后链", equipment: "bodyweight", recoveryPrimary: "后链", recoverySecondary: ["臀", "核心"] },
+    { id: "single-leg-rdl", name: "徒手单腿硬拉", mode: "bodyweight", primaryMuscle: "后链", equipment: "bodyweight", recoveryPrimary: "后链", recoverySecondary: ["臀", "核心"] },
+    { id: "bodyweight-calf-raise", name: "自重提踵", mode: "bodyweight", primaryMuscle: "小腿", equipment: "bodyweight", recoveryPrimary: "小腿", recoverySecondary: [] },
+    { id: "dead-bug", name: "死虫", mode: "bodyweight", primaryMuscle: "核心", equipment: "bodyweight", recoveryPrimary: "核心", recoverySecondary: [] },
+    { id: "side-plank", name: "侧平板支撑", mode: "bodyweight", primaryMuscle: "核心", equipment: "bodyweight", recoveryPrimary: "核心", recoverySecondary: [] },
+    { id: "bench-dip", name: "凳上臂屈伸", mode: "bodyweight", primaryMuscle: "三头", equipment: "bodyweight", recoveryPrimary: "三头", recoverySecondary: ["胸", "肩前束"] },
   ],
   records: [],
   foodRecords: [],
@@ -225,7 +242,26 @@ const SPLIT_SYSTEMS = {
 };
 const SPLIT_SYSTEM_KEYS = Object.keys(SPLIT_SYSTEMS);
 const MAJOR_PLAN_MUSCLES = ["胸", "背", "肩", "股四头", "后链", "臀"];
-const COMPOUND_EXERCISE_IDS = new Set(["bench-press", "push-up", "incline-dumbbell-press", "barbell-row", "lat-pulldown", "seated-row", "pull-up", "shoulder-press", "squat", "leg-press", "deadlift", "romanian-deadlift", "hip-thrust"]);
+const COMPOUND_EXERCISE_IDS = new Set(["bench-press", "push-up", "incline-push-up", "diamond-push-up", "pike-push-up", "elevated-pike-push-up", "incline-dumbbell-press", "barbell-row", "lat-pulldown", "seated-row", "pull-up", "chin-up", "inverted-row", "shoulder-press", "squat", "bodyweight-squat", "reverse-lunge", "bulgarian-split-squat", "leg-press", "deadlift", "romanian-deadlift", "single-leg-rdl", "hip-thrust", "glute-bridge", "single-leg-glute-bridge"]);
+const TRAINING_VOLUME_MUSCLES = ["胸", "背", "肩", "二头", "三头", "股四头", "后链", "臀", "小腿", "核心"];
+const SMALL_VOLUME_MUSCLES = new Set(["二头", "三头", "小腿", "核心"]);
+const WEEKLY_VOLUME_REFERENCE = {
+  hypertrophy: {
+    beginner: { major: [8, 12], small: [6, 10] },
+    intermediate: { major: [10, 14], small: [8, 12] },
+    advanced: { major: [12, 16], small: [10, 14] },
+  },
+  strength: {
+    beginner: { major: [6, 10], small: [4, 8] },
+    intermediate: { major: [6, 12], small: [4, 10] },
+    advanced: { major: [8, 14], small: [6, 10] },
+  },
+  fatloss: {
+    beginner: { major: [6, 10], small: [4, 8] },
+    intermediate: { major: [6, 10], small: [4, 8] },
+    advanced: { major: [6, 12], small: [4, 10] },
+  },
+};
 
 function normalizeDayTargets(dayTargets, daysPerWeek) {
   if (!Array.isArray(dayTargets)) return [];
@@ -353,6 +389,22 @@ function exerciseRecoveryProfile(exercise) {
   const secondary = inferRecoverySecondary(exercise.name, exercise.id, exercise.primaryMuscle, exercise.recoverySecondary)
     .filter((muscle) => muscle !== primary);
   return [{ muscle: primary, factor: 1 }, ...secondary.map((muscle) => ({ muscle, factor: .4 }))];
+}
+
+function trainingMuscleFromRecovery(muscle) {
+  if (["肩前束", "肩中束", "肩后束"].includes(muscle)) return "肩";
+  return TRAINING_VOLUME_MUSCLES.includes(muscle) ? muscle : "";
+}
+
+function exerciseTrainingVolumeProfile(exercise) {
+  if (!exercise) return [];
+  const primary = TRAINING_VOLUME_MUSCLES.includes(exercise.primaryMuscle) ? exercise.primaryMuscle : trainingMuscleFromRecovery(exercise.recoveryPrimary);
+  const secondary = [...new Set((exercise.recoverySecondary || []).map(trainingMuscleFromRecovery).filter(Boolean))]
+    .filter((muscle) => muscle !== primary);
+  return [
+    ...(primary ? [{ muscle: primary, factor: 1, role: "direct" }] : []),
+    ...secondary.map((muscle) => ({ muscle, factor: .5, role: "secondary" })),
+  ];
 }
 
 function recoveryForTrainingMuscle(primaryMuscle, recovery) {
@@ -1682,6 +1734,7 @@ function saveWeeklyPlan() {
   saveState();
   $("#weeklyPlanDialog").close();
   renderTodayPlan();
+  renderWeeklyTrainingVolume();
   showToast("周训练计划已保存");
 }
 
@@ -1751,6 +1804,7 @@ function saveTrainingProfileOnly() {
   saveState();
   renderSmartProfileSummary();
   renderRecoveryAdvisor();
+  renderWeeklyTrainingVolume();
   $("#smartPlanDialog").close();
   showToast("训练体系已保存");
 }
@@ -1832,6 +1886,14 @@ function latestWorkingWeight(exerciseId) {
   return last ? representativeWorkingWeight(last.sets) : 0;
 }
 
+function exerciseCoversTrainingMuscle(exercise, muscle) {
+  if (!exercise) return false;
+  if (exercise.primaryMuscle === muscle) return true;
+  const recovery = [exercise.recoveryPrimary, ...(exercise.recoverySecondary || [])];
+  if (muscle === "肩") return recovery.some((item) => String(item || "").startsWith("肩"));
+  return recovery.includes(muscle);
+}
+
 function generatedTemplateFromMuscles(name, muscles, profile, minutes = profile.sessionMinutes, variantIndex = 0) {
   const timeMax = minutes <= 30 ? 4 : minutes <= 45 ? 5 : minutes <= 60 ? 6 : minutes <= 75 ? 7 : 8;
   const baseMax = muscles.length >= 7 && minutes >= 60 ? Math.max(timeMax, 7) : timeMax;
@@ -1843,7 +1905,11 @@ function generatedTemplateFromMuscles(name, muscles, profile, minutes = profile.
   const capForMuscle = (muscle) => smallMuscles.has(muscle) ? 2 : (muscles.length === 1 ? 3 : 2);
   const addCandidate = (muscle, round = 0) => {
     if (selected.length >= maxExercises || (muscleCounts[muscle] || 0) >= capForMuscle(muscle)) return;
-    const candidates = available.filter((exercise) => exercise.primaryMuscle === muscle && !selected.some((item) => item.id === exercise.id));
+    const direct = available.filter((exercise) => exercise.primaryMuscle === muscle && !selected.some((item) => item.id === exercise.id));
+    const allowSecondaryFallback = ["二头", "三头"].includes(muscle);
+    const candidates = direct.length
+      ? direct
+      : (allowSecondaryFallback ? available.filter((exercise) => exerciseCoversTrainingMuscle(exercise, muscle) && !selected.some((item) => item.id === exercise.id)) : []);
     if (!candidates.length) return;
     const compounds = candidates.filter((exercise) => COMPOUND_EXERCISE_IDS.has(exercise.id));
     const pool = round === 0 && compounds.length ? compounds : candidates;
@@ -1879,12 +1945,15 @@ function splitPreviewData(profile) {
   return blueprint.map((item, index) => {
     const template = generatedTemplateFromMuscles(item.name, item.muscles, normalized, normalized.sessionMinutes, index);
     const totalSets = template.exercises.reduce((sum, exercise) => sum + (exercise.sets?.length || 0), 0);
+    const templateExercises = template.exercises.map((exercise) => exerciseById(exercise.exerciseId)).filter(Boolean);
+    const missingMuscles = item.muscles.filter((muscle) => !templateExercises.some((exercise) => exerciseCoversTrainingMuscle(exercise, muscle)));
     return {
       name: item.name,
       targets: item.targets,
-      exercises: template.exercises.map((exercise) => exerciseById(exercise.exerciseId)?.name || "动作"),
+      exercises: templateExercises.map((exercise) => exercise.name),
       exerciseCount: template.exercises.length,
       totalSets,
+      missingMuscles,
     };
   });
 }
@@ -1893,9 +1962,10 @@ function renderSplitPlanPreview(rootSelector, profile) {
   const root = $(rootSelector);
   if (!root) return;
   const sessions = splitPreviewData(profile);
-  root.innerHTML = sessions.map((session, index) => `<article class="split-preview-day">
+  root.innerHTML = sessions.map((session, index) => `<article class="split-preview-day ${session.missingMuscles.length ? "has-warning" : ""}">
     <div class="split-preview-head"><span>第 ${index + 1} 练</span><strong>${escapeHtml(session.name)}</strong><small>${session.exerciseCount} 动作 · ${session.totalSets} 组</small></div>
     <div class="split-preview-exercises">${session.exercises.map((name, exerciseIndex) => `<span>${exerciseIndex + 1}. ${escapeHtml(name)}</span>`).join("")}</div>
+    ${session.missingMuscles.length ? `<p class="split-preview-warning">当前器械缺少：${session.missingMuscles.map(escapeHtml).join("、")} 的合适动作</p>` : ""}
   </article>`).join("");
 }
 
@@ -2065,6 +2135,7 @@ function generateSmartWeeklyPlan() {
   renderTodayPlan();
   renderSmartProfileSummary();
   renderRecoveryAdvisor();
+  renderWeeklyTrainingVolume();
   $("#smartPlanDialog").close();
   showToast(`已生成 ${profile.daysPerWeek} 天训练计划，可在周计划里改日期和时间`);
 }
@@ -2190,38 +2261,243 @@ function saveCreatedWorkout() {
   showToast("已保存为训练模板");
 }
 
+function weeklyVolumeTargetForMuscle(muscle, profile = normalizeTrainingProfile(state.trainingProfile)) {
+  const goal = WEEKLY_VOLUME_REFERENCE[profile.goal] || WEEKLY_VOLUME_REFERENCE.hypertrophy;
+  const level = goal[profile.level] || goal.intermediate;
+  return SMALL_VOLUME_MUSCLES.has(muscle) ? level.small : level.major;
+}
+
+function blankMuscleVolume() {
+  return Object.fromEntries(TRAINING_VOLUME_MUSCLES.map((muscle) => [muscle, 0]));
+}
+
+function addExerciseVolume(totals, exercise, formalSets) {
+  if (!exercise || formalSets <= 0) return;
+  exerciseTrainingVolumeProfile(exercise).forEach(({ muscle, factor }) => {
+    totals[muscle] = (totals[muscle] || 0) + formalSets * factor;
+  });
+}
+
+function weeklyCompletedMuscleVolume() {
+  const totals = blankMuscleVolume();
+  const start = startOfWeek(new Date());
+  const startIso = localDateISO(start);
+  const endIso = localDateISO(addDays(start, 6));
+  state.records
+    .filter((record) => record.date >= startIso && record.date <= endIso)
+    .forEach((record) => addExerciseVolume(totals, exerciseById(record.exerciseId), sumSets(record.sets)));
+  return totals;
+}
+
+function weeklyPlannedMuscleVolume() {
+  const totals = blankMuscleVolume();
+  normalizeWeeklyPlan(state.weeklyPlan).forEach((entry) => {
+    if (!entry.isTrainingDay || !entry.templateId) return;
+    const template = state.templates.find((item) => item.id === entry.templateId);
+    if (!template) return;
+    (template.exercises || []).forEach((item) => {
+      addExerciseVolume(totals, exerciseById(item.exerciseId), countableSets(item.sets || []).length);
+    });
+  });
+  return totals;
+}
+
+function renderWeeklyTrainingVolume() {
+  const root = $("#weeklyVolumeRows");
+  const summary = $("#weeklyVolumeSummary");
+  if (!root || !summary) return;
+  const profile = normalizeTrainingProfile(state.trainingProfile);
+  const completed = weeklyCompletedMuscleVolume();
+  const planned = weeklyPlannedMuscleVolume();
+  const active = TRAINING_VOLUME_MUSCLES.filter((muscle) => completed[muscle] > 0 || planned[muscle] > 0);
+  const goalLabel = TRAINING_GOAL_LABELS[profile.goal] || "训练";
+  const levelLabel = TRAINING_LEVEL_LABELS[profile.level] || "中级";
+  summary.textContent = `按 ${goalLabel} · ${levelLabel} 显示参考区间；主练正式组按 1 组、次要参与按 0.5 组折算。`;
+  if (!active.length) {
+    root.innerHTML = '<div class="weekly-volume-empty">生成周计划或完成一次训练后，这里会显示各肌群的本周训练量。</div>';
+    return;
+  }
+  root.innerHTML = active.map((muscle) => {
+    const done = completed[muscle] || 0;
+    const plan = planned[muscle] || 0;
+    const [low, high] = weeklyVolumeTargetForMuscle(muscle, profile);
+    const progress = Math.min(100, done / Math.max(1, high) * 100);
+    const remaining = Math.max(0, low - done);
+    const status = done >= low ? "已达参考下限" : `还差约 ${formatNumber(remaining, 1)} 组`;
+    const planState = plan <= 0 ? "暂无周计划" : plan < low ? "计划低于参考下限" : plan > high ? "计划高于参考上沿" : "计划在参考区间";
+    return `<article class="weekly-volume-row">
+      <div class="weekly-volume-row-head"><strong>${muscle}</strong><span>${status}</span></div>
+      <div class="weekly-volume-values"><span>已完成 <b>${formatNumber(done, 1)}</b></span><span>周计划 <b>${formatNumber(plan, 1)}</b></span><span>参考 <b>${low}–${high}</b></span></div>
+      <div class="weekly-volume-track" aria-label="${muscle}本周训练量"><i style="width:${progress}%"></i></div>
+      <small>${planState}</small>
+    </article>`;
+  }).join("");
+}
+
+function recentExerciseRecords(exerciseId, limit = 4) {
+  return state.records
+    .filter((record) => record.exerciseId === exerciseId && record.id !== editingWorkoutId)
+    .sort((a, b) => String(b.createdAt || b.date).localeCompare(String(a.createdAt || a.date)))
+    .slice(0, limit);
+}
+
+function performanceSnapshot(record) {
+  const sets = countableSets(record?.sets || []).filter((set) => Number(set.reps) > 0);
+  const rpes = sets.map((set) => Number(set.rpe)).filter((value) => value >= 6 && value <= 10);
+  const avgRpe = rpes.length ? rpes.reduce((sum, value) => sum + value, 0) / rpes.length : null;
+  const avgReps = sets.length ? sumReps(sets) / sets.length : 0;
+  return {
+    date: record?.date || "",
+    sets: sets.length,
+    totalReps: sumReps(sets),
+    avgReps,
+    avgRpe,
+    weight: representativeWorkingWeight(sets),
+    feedback: record?.feedback || "",
+  };
+}
+
+function progressionRepRange(profile, exercise) {
+  const compound = COMPOUND_EXERCISE_IDS.has(exercise?.id);
+  if (exercise?.mode === "bodyweight") {
+    if (profile.goal === "strength") return [5, 12];
+    return [8, 20];
+  }
+  if (profile.goal === "strength") return compound ? [3, 6] : [6, 10];
+  if (profile.goal === "fatloss") return [8, 15];
+  return compound ? [6, 12] : [8, 15];
+}
+
+function roundedTrainingWeightKg(valueKg) {
+  const displayStep = currentWeightUnit() === "lb" ? 5 : 2.5;
+  const display = weightToDisplay(Math.max(0, Number(valueKg) || 0));
+  return weightFromDisplay(Math.round(display / displayStep) * displayStep);
+}
+
+function progressionTrendText(snapshots, exercise) {
+  return snapshots.slice(0, 3).reverse().map((item) => {
+    const effort = item.avgRpe == null ? "" : ` · RPE ${formatNumber(item.avgRpe, 1)}`;
+    if (exercise.mode === "bodyweight") return `${formatDate(item.date)} ${formatNumber(item.avgReps, 1)} 次/组${effort}`;
+    return `${formatDate(item.date)} ${weightText(item.weight, 1)} × ${formatNumber(item.avgReps, 1)}${effort}`;
+  }).join(" → ");
+}
+
+function progressionAdvice(exercise) {
+  const records = recentExerciseRecords(exercise.id, 4);
+  if (!records.length) return {
+    kind: "baseline",
+    badge: "建立基线",
+    title: "先完成一次这个动作",
+    body: "有训练记录后，会结合最近几次的重量、次数、RPE 和训练反馈给出下一次建议。",
+    trend: "",
+  };
+  const profile = normalizeTrainingProfile(state.trainingProfile);
+  const snapshots = records.map(performanceSnapshot);
+  const latest = snapshots[0];
+  const previous = snapshots[1];
+  const [repLow, repHigh] = progressionRepRange(profile, exercise);
+  const latestRpe = latest.avgRpe ?? 8;
+  const feedbackHard = latest.feedback === "hard";
+  const feedbackEasy = latest.feedback === "easy";
+  const hard = feedbackHard || latestRpe >= 9.5;
+  const easy = feedbackEasy || latestRpe <= 7.5;
+  const sameLoad = previous && exercise.mode !== "bodyweight" && latest.weight > 0
+    ? Math.abs(latest.weight - previous.weight) / Math.max(1, latest.weight) <= .025
+    : Boolean(previous && exercise.mode === "bodyweight");
+  const declining = Boolean(previous && sameLoad && (latest.totalReps + 1 < previous.totalReps || latest.avgReps + .5 < previous.avgReps));
+  const previousRpe = previous?.avgRpe ?? 8;
+  const twoHard = Boolean(previous && hard && (previous.feedback === "hard" || previousRpe >= 9.5));
+  const reachedTop = latest.avgReps >= repHigh;
+  const repeatedTop = Boolean(previous && sameLoad && reachedTop && previous.avgReps >= repHigh - .5 && previousRpe <= 8.5);
+  const trend = progressionTrendText(snapshots, exercise);
+
+  if (exercise.mode === "bodyweight") {
+    if (twoHard || (hard && declining)) return {
+      kind: "reduce",
+      badge: "降低难度",
+      title: "下一次每组少 1–2 次",
+      body: `最近完成度下降且主观强度偏高。先把每组控制在约 ${Math.max(1, Math.round(latest.avgReps) - 1)} 次，稳定后再继续增加。`,
+      trend,
+    };
+    if (reachedTop && !hard) return {
+      kind: "load",
+      badge: "升级刺激",
+      title: "达到次数上沿，考虑更难变式",
+      body: `当前参考区间约 ${repLow}–${repHigh} 次/组；已经接近或达到上沿。可以换更难的自重变式，或继续小幅增加次数。`,
+      trend,
+    };
+    const add = easy ? 2 : 1;
+    return {
+      kind: "reps",
+      badge: "加次数",
+      title: `下一次每组尝试 +${add} 次`,
+      body: `先在同一动作上增加重复次数，目标仍保持在约 ${repLow}–${repHigh} 次/组；不要求每次训练都必须进步。`,
+      trend,
+    };
+  }
+
+  const workingWeight = latest.weight;
+  if (!workingWeight) return {
+    kind: "baseline",
+    badge: "建立重量",
+    title: "先记录一个稳定的工作重量",
+    body: `当前目标次数区间约 ${repLow}–${repHigh} 次/组。先找到能稳定完成并保留适当余力的重量，再开始渐进。`,
+    trend,
+  };
+  if (twoHard || (hard && declining)) {
+    const reduced = roundedTrainingWeightKg(workingWeight * .95);
+    return {
+      kind: "reduce",
+      badge: "降一点",
+      title: `下一次约 ${weightText(reduced, 1)}`,
+      body: "连续高 RPE 或完成度下降时，不继续硬加重量；先降低约 5% 左右，把动作质量和目标次数稳定下来。",
+      trend,
+    };
+  }
+  if (hard) return {
+    kind: "hold",
+    badge: "保持",
+    title: `保持 ${weightText(workingWeight, 1)}`,
+    body: `上次强度已经偏高。下一次先稳定相同重量和次数，不需要为了“渐进”强行加重。`,
+    trend,
+  };
+  if ((repeatedTop || (easy && reachedTop)) && snapshots.length >= 2) {
+    const increment = currentWeightUnit() === "lb" ? 5 / 2.2046226218 : 2.5;
+    const nextWeight = roundedTrainingWeightKg(workingWeight + increment);
+    return {
+      kind: "load",
+      badge: "加重量",
+      title: `下一次尝试 ${weightText(nextWeight, 1)}`,
+      body: `最近在相同重量下已经达到约 ${repHigh} 次/组且 RPE 可控，可以小幅加重；加重后允许次数回到区间下半段。`,
+      trend,
+    };
+  }
+  if (latest.avgReps < repLow) return {
+    kind: "hold",
+    badge: "先稳定",
+    title: `保持 ${weightText(workingWeight, 1)}`,
+    body: `当前平均 ${formatNumber(latest.avgReps, 1)} 次/组，尚未稳定进入 ${repLow}–${repHigh} 次参考区间。先完成目标次数，再考虑加重量。`,
+    trend,
+  };
+  return {
+    kind: "reps",
+    badge: "加次数",
+    title: `保持 ${weightText(workingWeight, 1)}，每组尝试 +1 次`,
+    body: `采用双重渐进：先把相同重量的次数逐步提高到约 ${repHigh} 次/组；连续稳定后再小幅加重量。`,
+    trend,
+  };
+}
+
 function renderProgressionSuggestion() {
   const exercise = exerciseById($("#exerciseSelect")?.value);
-  if (!exercise || !$("#progressionSuggestionTitle")) return;
-  const record = lastComparableRecord(exercise.id);
-  if (!record) {
-    $("#progressionSuggestionTitle").textContent = "先完成一次这个动作";
-    $("#progressionSuggestionBody").textContent = "有训练记录后，会结合重量、次数、RPE 和反馈给出下一次建议。";
-    return;
-  }
-  const sets = countableSets(record.sets).filter((set) => Number(set.reps) > 0);
-  const avgRpeValues = sets.map((set) => Number(set.rpe)).filter((value) => value >= 6 && value <= 10);
-  const avgRpe = avgRpeValues.length ? avgRpeValues.reduce((sum, value) => sum + value, 0) / avgRpeValues.length : 8;
-  const avgReps = sets.length ? sumReps(sets) / sets.length : 0;
-  const feedback = record.feedback || "";
-  if (exercise.mode === "bodyweight") {
-    const add = feedback === "easy" || avgRpe <= 7.5 ? 2 : feedback === "hard" || avgRpe >= 9.5 ? 0 : 1;
-    $("#progressionSuggestionTitle").textContent = add ? `每组尝试 +${add} 次` : "先保持次数，不急着增加";
-    $("#progressionSuggestionBody").textContent = `上次平均 ${formatNumber(avgReps, 1)} 次 / RPE ${formatNumber(avgRpe, 1)}${feedback ? ` · 反馈：${feedback === "easy" ? "太轻" : feedback === "hard" ? "太难" : "合适"}` : ""}。`;
-    return;
-  }
-  const workingWeight = representativeWorkingWeight(sets);
-  if (feedback === "hard" || avgRpe >= 9.5) {
-    $("#progressionSuggestionTitle").textContent = `保持 ${weightText(workingWeight, 1)}，先少 1 次/组`;
-    $("#progressionSuggestionBody").textContent = `上次 RPE ${formatNumber(avgRpe, 1)} 偏高，优先把动作质量和完成度稳定下来。`;
-  } else if (feedback === "easy" || avgRpe <= 7.5) {
-    const increment = currentWeightUnit() === "lb" ? 5 / 2.2046226218 : 2.5;
-    $("#progressionSuggestionTitle").textContent = `尝试 ${weightText(workingWeight + increment, 1)}`;
-    $("#progressionSuggestionBody").textContent = `上次代表性重量 ${weightText(workingWeight, 1)} · 平均 ${formatNumber(avgReps, 1)} 次 · RPE ${formatNumber(avgRpe, 1)}，可以小幅加重。`;
-  } else {
-    $("#progressionSuggestionTitle").textContent = `保持 ${weightText(workingWeight, 1)}，每组 +1 次`;
-    $("#progressionSuggestionBody").textContent = `先用相同重量增加总次数；当 RPE 仍稳定在 8 左右，再增加重量。`;
-  }
+  const title = $("#progressionSuggestionTitle");
+  if (!exercise || !title) return;
+  const advice = progressionAdvice(exercise);
+  title.textContent = advice.title;
+  $("#progressionSuggestionBody").textContent = advice.body;
+  if ($("#progressionSuggestionBadge")) $("#progressionSuggestionBadge").textContent = advice.badge;
+  if ($("#progressionSuggestionTrend")) $("#progressionSuggestionTrend").textContent = advice.trend || "建议会在积累 2–3 次可比较训练后更稳定。";
+  if ($("#progressionSuggestionCard")) $("#progressionSuggestionCard").dataset.progression = advice.kind;
 }
 
 function openWorkoutFeedback(recordId) {
@@ -3723,6 +3999,7 @@ function renderAll() {
   renderWeeklyPlanRows();
   renderTodayPlan();
   renderSmartProfileSummary();
+  renderWeeklyTrainingVolume();
   renderProgressionSuggestion();
   renderRecoveryAdvisor();
   renderDashboard();
